@@ -1,0 +1,46 @@
+import {BaseClient} from './baseClient';
+
+export class Client extends BaseClient {
+<% for(const func of functions) { %>
+        async <%= func.name %>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>) :Promise<<%= func.returnType %>>{
+        <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
+
+        const options = {
+            method: "<%= func.method%>",
+            headers: {
+                "Content-Type": "application/json",
+                "Accept": "application/json"
+            }
+        } as RequestInit;
+        <% if(func.requestType!=='void') {%>
+        <% if(func.method.toUpperCase()==='GET') {%>
+        url += Object.keys(model).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
+        <% } else {%>
+        options.body = JSON.stringify(model);
+        <% } %>
+        <% } %>
+
+        const response = await fetch(url, await this.transformOptions(options));
+
+        const status = response.status;
+        const headers: any = {};
+
+        if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
+
+        if (status === 200) {
+            const responseText = await response.text();
+            return responseText === "" ? null : JSON.parse(responseText) as <%= func.returnType %>;
+        } else if (status !== 200 && status !== 204) {
+            const responseText = await response.text();
+            throw new Error("An unexpected server error occurred.");
+        }
+        return Promise.resolve<<%= func.returnType %>>(null);
+    }
+<% } %>
+
+}
+
+
+<% for(const interface of interfaces) { %>
+    <%= interface %>
+<% } %>

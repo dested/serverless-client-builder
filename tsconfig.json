@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "noEmitOnError": false,
+    "experimentalDecorators": true,
+    "allowUnreachableCode": true,
+    "strict": true,
+    "target": "es2017",
+    "module": "commonjs",
+    "inlineSourceMap": true,
+    "strictNullChecks": false,
+    "noEmit": true,
+    "lib": ["es2015","dom"],
+    "pretty": true,
+    "moduleResolution": "node",
+    "strictPropertyInitialization": false,
+    "allowSyntheticDefaultImports": true,
+    "baseUrl": "./",
+    "outDir": "./dist",
+    "skipLibCheck": true,
+    "paths": {
+      "@swg-server-common/*":["../server-common/src/*"],
+      "@swg-common/*":["../common/src/*"]
+    }
+  }
+}
