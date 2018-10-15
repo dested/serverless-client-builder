@@ -15,6 +15,8 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
   });
 
   const h = project.getSourceFile('handler.ts');
+  /*  tsquery(h.compilerNode, '*', {visitAllChildren: true}); */
+
   const funcs = h
     .getChildren()[0]
     .getChildren()
@@ -70,7 +72,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
   }
   functions = functions.filter(a => a.found);
 
-  let html = ejs.render(
+  let js = ejs.render(
     fs.readFileSync('./template.ejs', {encoding: 'utf8'}),
     {
       interfaces: symbols.map(a => getSource(a)),
@@ -79,11 +81,11 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
     {escape: e => e}
   );
 
-  html = prettier.format(html, readJson(prettierFile));
+  js = prettier.format(js, readJson(prettierFile));
 
-  console.log(html);
+  // console.log(js);
 
-  fs.writeFileSync(outputFile, html, {encoding: 'utf8'});
+  fs.writeFileSync(outputFile, js, {encoding: 'utf8'});
 }
 
 function assert(thing: boolean, error: string) {
@@ -121,6 +123,7 @@ function addSymbol(symbol: Symbol) {
 
   if (baseTypes.length > 0) {
     for (const baseType of baseTypes) {
+      // console.log('1', baseType);
       addSymbol(baseType);
     }
   }
@@ -128,7 +131,18 @@ function addSymbol(symbol: Symbol) {
   for (const member of symbol.getMembers()) {
     const memberType = member.getDeclarations()[0].getType();
     if (memberType.isArray()) {
-      addSymbol(memberType.getTypeArguments()[0].getSymbol());
+      switch (memberType.getTypeArguments()[0].getText()) {
+        case 'any':
+        case 'string':
+        case 'boolean':
+        case 'number':
+          break;
+        default:
+          const symbol1 = memberType.getTypeArguments()[0].getSymbol();
+          // console.log('2', symbol1);
+          addSymbol(symbol1);
+          break;
+      }
     } else {
       switch (memberType.getText()) {
         case 'any':
@@ -138,11 +152,14 @@ function addSymbol(symbol: Symbol) {
           break;
         default:
           if (memberType.getSymbol()) {
+            // console.log('3', memberType);
             addSymbol(memberType.getSymbol());
           } else {
-            addSymbol(memberType.getAliasSymbol());
+            const aliasSymbol = memberType.getAliasSymbol();
+            if (memberType.getAliasSymbol()) {
+              addSymbol(aliasSymbol);
+            }
           }
-
           break;
       }
     }
@@ -150,5 +167,19 @@ function addSymbol(symbol: Symbol) {
 }
 
 function getSource(symbol: ts.Symbol) {
-  return symbol.declarations[0].getText();
+  return symbol.declarations
+    .map(a => {
+      let str = a.getText();
+      if (str.indexOf('export') === -1) {
+        str = 'export ' + str;
+      }
+      return str;
+    })
+    .join('\n');
 }
+process(
+  'C:\\code\\cleverrx\\api\\tsconfig.json',
+  'C:\\code\\cleverrx\\api\\serverless.yml',
+  'C:\\code\\cleverrx\\api\\.prettierrc',
+  'C:\\code\\cleverrx\\web\\src\\dataServices\\app.generated.ts'
+);
