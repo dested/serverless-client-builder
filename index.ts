@@ -36,7 +36,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
     if (TypeGuards.isArrowFunction(funcNode)) {
       assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
       const eventArg = funcNode.getParameters()[0].getType();
-      assert(eventArg.getSymbol().getName() === 'Event', 'Event argument must be a generic event class');
+      assert(eventArg.getSymbol().getName() === 'RequestEvent', 'RequestEvent argument must be a generic event class');
       const typeArgument = eventArg.getTypeArguments()[0];
       let requestName: string;
       if (typeArgument.getText() !== 'void') {
