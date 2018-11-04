@@ -54,8 +54,21 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
         'Return type must must be a promise of HttpResponse'
       );
       const httpResponseTypeArgument = returnTypeArgument.getTypeArguments()[0];
+      const httpResponseErrorArgument = returnTypeArgument.getTypeArguments()[1];
+
+      const errorTypes: ts.Symbol[] = [];
+
+      if ((httpResponseErrorArgument.compilerType as any).intrinsicName !== 'undefined') {
+        if (httpResponseErrorArgument.getUnionTypes().length === 0) {
+          errorTypes.push(httpResponseErrorArgument.getApparentType().compilerType.getSymbol());
+        } else {
+          for (const unionType of httpResponseErrorArgument.getUnionTypes()) {
+            errorTypes.push(unionType.compilerType.getSymbol());
+          }
+        }
+      }
       addSymbol(httpResponseTypeArgument.getSymbol());
-      addFunction(funcName, requestName, httpResponseTypeArgument.getSymbol().getName());
+      addFunction(funcName, requestName, httpResponseTypeArgument.getSymbol().getName(), errorTypes);
     }
   }
 
@@ -101,10 +114,34 @@ let functions: {
   name: string;
   requestType: string;
   returnType: string;
+  errorCode: string[];
+  handleType: string;
 }[] = [];
 
-function addFunction(name: string, requestType: string, returnType: string) {
-  functions.push({name, requestType, returnType, url: '', method: '', found: false});
+function getSourceWithoutStatusCode(a: ts.Symbol) {
+  const source = getSource(a, false);
+  return source.replace(/statusCode\s*:\s*\d+,?;?/g, '');
+}
+
+function addFunction(name: string, requestType: string, returnType: string, errorTypes: ts.Symbol[]) {
+  const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
+  const handleType = `{200:(result:${returnType})=>void,${errorTypes
+    .map(a => {
+      const statusCode = (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text;
+      const source = getSourceWithoutStatusCode(a);
+      return `${statusCode}:(result:${source})=>void`;
+    })
+    .join(',')}}`;
+  functions.push({
+    name,
+    handleType,
+    requestType,
+    returnType,
+    url: '',
+    method: '',
+    found: false,
+    errorCode,
+  });
 }
 
 const symbols: ts.Symbol[] = [];
@@ -166,20 +203,21 @@ function addSymbol(symbol: Symbol) {
   }
 }
 
-function getSource(symbol: ts.Symbol) {
+function getSource(symbol: ts.Symbol, addExport: boolean = true) {
   return symbol.declarations
     .map(a => {
       let str = a.getText();
-      if (str.indexOf('export') === -1) {
+      if (addExport && str.indexOf('export') === -1) {
         str = 'export ' + str;
       }
       return str;
     })
     .join('\n');
 }
+
 process(
-  'C:\\code\\cleverrx\\api\\tsconfig.json',
-  'C:\\code\\cleverrx\\api\\serverless.yml',
-  'C:\\code\\cleverrx\\api\\.prettierrc',
-  'C:\\code\\cleverrx\\web\\src\\dataServices\\app.generated.ts'
+  '/Users/sal/code/styr/CleverRX/api/tsconfig.json',
+  '/Users/sal/code/styr/CleverRX/api/serverless.yml',
+  '/Users/sal/code/styr/CleverRX/api/.prettierrc',
+  '/Users/sal/code/styr/CleverRX/app/src/dataServices/app.generated.ts'
 );
