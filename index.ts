@@ -125,7 +125,7 @@ function getSourceWithoutStatusCode(a: ts.Symbol) {
 
 function addFunction(name: string, requestType: string, returnType: string, errorTypes: ts.Symbol[]) {
   const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
-  const handleType = `{200:(result:${returnType})=>void,${errorTypes
+  const handleType = `{200:(result:${returnType})=>void,500:(result:string)=>void,${errorTypes
     .map(a => {
       const statusCode = (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text;
       const source = getSourceWithoutStatusCode(a);
