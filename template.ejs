@@ -2,7 +2,7 @@
 import {BaseClient} from './baseClient';
 export class Client extends BaseClient {
 <% for(const func of functions) { %>
-        async <%= func.name %>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<void>{
+        async <%= func.name %><TPromise=void>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
         <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
 
         const options = {
@@ -14,7 +14,7 @@ export class Client extends BaseClient {
         } as RequestInit;
         <% if(func.requestType!=='void') {%>
         <% if(func.method.toUpperCase()==='GET') {%>
-        url += Object.keys(model).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
+        url += Object.keys(model)      .filter(a => !!(model as any)[a]).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
         <% } else {%>
         options.body = JSON.stringify(model);
         <% } %>
@@ -29,15 +29,15 @@ export class Client extends BaseClient {
 
         if (status === 200) {
             const responseText = await response.text();
-            handle[200](responseText === "" ? null : JSON.parse(responseText));
+            return await handle[200](responseText === "" ? null : JSON.parse(responseText));
         }
         <%=func.errorCode.map(a=>`else if (status === ${a}) {
             const responseText = await response.text();
-            handle[${a}](responseText === "" ? null : JSON.parse(responseText));
+            await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('')%>
         else {
             const responseText = await response.text();
-            handle[500](responseText);
+    await handle[500](responseText);
         }
     }
 <% } %>

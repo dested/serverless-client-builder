@@ -125,7 +125,7 @@ function getSourceWithoutStatusCode(a: ts.Symbol) {
 
 function addFunction(name: string, requestType: string, returnType: string, errorTypes: ts.Symbol[]) {
   const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
-  const handleType = `{200:(result:${returnType})=>void,500:(result:string)=>void,${errorTypes
+  const handleType = `{200:(result:${returnType})=>TPromise,500:(result:string)=>void,${errorTypes
     .map(a => {
       const statusCode = (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text;
       const source = getSourceWithoutStatusCode(a);
@@ -215,9 +215,16 @@ function getSource(symbol: ts.Symbol, addExport: boolean = true) {
     .join('\n');
 }
 
-process(
+/*process(
   '/Users/sal/code/styr/CleverRX/api/tsconfig.json',
   '/Users/sal/code/styr/CleverRX/api/serverless.yml',
   '/Users/sal/code/styr/CleverRX/api/.prettierrc',
   '/Users/sal/code/styr/CleverRX/app/src/dataServices/app.generated.ts'
+);*/
+
+process(
+  'c:/code/CleverRX/api/tsconfig.json',
+  'c:/code/CleverRX/api/serverless.yml',
+  'c:/code/CleverRX/api/.prettierrc',
+  'c:/code/CleverRX/app/src/dataServices/app.generated.ts'
 );
