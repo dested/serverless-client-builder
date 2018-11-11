@@ -1,7 +1,7 @@
 import * as ejs from 'ejs';
 import * as fs from 'fs';
 import * as prettier from 'prettier';
-import Project, {ScriptTarget, Symbol, ts, TypeGuards} from 'ts-simple-ast';
+import Project, {ScriptTarget, Symbol, ts, Type, TypeGuards} from 'ts-simple-ast';
 import * as yamljs from 'yamljs';
 
 const readJson = (path: string) => {
@@ -40,7 +40,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
       const typeArgument = eventArg.getTypeArguments()[0];
       let requestName: string;
       if (typeArgument.getText() !== 'void') {
-        addSymbol(typeArgument.getSymbol());
+        addSymbol(typeArgument);
         requestName = typeArgument.getSymbol().getName();
       } else {
         requestName = 'void';
@@ -67,7 +67,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
           }
         }
       }
-      addSymbol(httpResponseTypeArgument.getSymbol());
+      addSymbol(httpResponseTypeArgument);
       addFunction(funcName, requestName, httpResponseTypeArgument.getSymbol().getName(), errorTypes);
     }
   }
@@ -146,17 +146,27 @@ function addFunction(name: string, requestType: string, returnType: string, erro
 
 const symbols: ts.Symbol[] = [];
 
-function addSymbol(symbol: Symbol) {
+function addSymbol(type: Type<ts.Type>) {
+  for (const t of type.getIntersectionTypes()) {
+    addSymbol(t);
+  }
+  for (const t of type.getUnionTypes()) {
+    addSymbol(t);
+  }
+
+  const symbol = type.getSymbol() || type.getAliasSymbol();
+  if (!symbol) {
+    // console.log(type.getText());
+    return;
+  }
+
   if (symbol.getName() !== '__type') {
     if (!symbols.find(a => a === symbol.compilerSymbol)) {
       symbols.push(symbol.compilerSymbol);
     }
   }
 
-  const baseTypes = symbol
-    .getDeclaredType()
-    .getBaseTypes()
-    .map(a => a.getSymbol());
+  const baseTypes = type.getBaseTypes();
 
   if (baseTypes.length > 0) {
     for (const baseType of baseTypes) {
@@ -165,7 +175,17 @@ function addSymbol(symbol: Symbol) {
     }
   }
 
+  for (const declaration of symbol.getDeclarations()) {
+    for (const t of declaration.getType().getIntersectionTypes()) {
+      addSymbol(t);
+    }
+    for (const t of declaration.getType().getUnionTypes()) {
+      addSymbol(t);
+    }
+  }
+
   for (const member of symbol.getMembers()) {
+    // console.log(symbol.getName() + ' ' + member.getName());
     const memberType = member.getDeclarations()[0].getType();
     if (memberType.isArray()) {
       switch (memberType.getTypeArguments()[0].getText()) {
@@ -175,9 +195,10 @@ function addSymbol(symbol: Symbol) {
         case 'number':
           break;
         default:
-          const symbol1 = memberType.getTypeArguments()[0].getSymbol();
-          // console.log('2', symbol1);
-          addSymbol(symbol1);
+          const symbol1 = memberType.getTypeArguments()[0];
+          if (symbol1) {
+            addSymbol(symbol1);
+          }
           break;
       }
     } else {
@@ -188,15 +209,7 @@ function addSymbol(symbol: Symbol) {
         case 'number':
           break;
         default:
-          if (memberType.getSymbol()) {
-            // console.log('3', memberType);
-            addSymbol(memberType.getSymbol());
-          } else {
-            const aliasSymbol = memberType.getAliasSymbol();
-            if (memberType.getAliasSymbol()) {
-              addSymbol(aliasSymbol);
-            }
-          }
+          addSymbol(memberType);
           break;
       }
     }
