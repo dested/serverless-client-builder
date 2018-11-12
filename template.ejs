@@ -27,17 +27,16 @@ export class Client extends BaseClient {
 
         if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
 
+        const responseText = await response.text();
+
         if (status === 200) {
-            const responseText = await response.text();
             return await handle[200](responseText === "" ? null : JSON.parse(responseText));
         }
         <%=func.errorCode.map(a=>`else if (status === ${a}) {
-            const responseText = await response.text();
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('')%>
         else {
-            const responseText = await response.text();
-    await handle[500](responseText);
+            await handle[500](responseText);
         }
     }
 <% } %>
