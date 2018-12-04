@@ -5,7 +5,9 @@
   "main": "index.js",
   "scripts": {
     "start": "node -r ts-node/register index",
-    "debug": "node --inspect-brk -r ts-node/register index.ts"
+    "debug": "node --inspect-brk -r ts-node/register index.ts",
+    "test": "node -r ts-node/register tester",
+    "debug-test": "node --inspect-brk -r ts-node/register tester.ts"
   },
   "devDependencies": {
     "@phenomnomnominal/tsquery": "^2.1.1",

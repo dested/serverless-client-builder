@@ -3,6 +3,7 @@ import * as fs from 'fs';
 import * as prettier from 'prettier';
 import Project, {ScriptTarget, Symbol, ts, Type, TypeGuards} from 'ts-simple-ast';
 import * as yamljs from 'yamljs';
+import {ManageSymbols} from './manageSymbols';
 
 const readJson = (path: string) => {
   return JSON.parse(fs.readFileSync(require.resolve(path), {encoding: 'utf8'}));
@@ -13,6 +14,8 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
   const project = new Project({
     tsConfigFilePath,
   });
+
+  const symbolManager = new ManageSymbols();
 
   const h = project.getSourceFile('handler.ts');
   /*  tsquery(h.compilerNode, '*', {visitAllChildren: true}); */
@@ -40,7 +43,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
       const typeArgument = eventArg.getTypeArguments()[0];
       let requestName: string;
       if (typeArgument.getText() !== 'void') {
-        addSymbol(typeArgument);
+        symbolManager.addSymbol(typeArgument);
         requestName = typeArgument.getSymbol().getName();
       } else {
         requestName = 'void';
@@ -67,7 +70,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
           }
         }
       }
-      addSymbol(httpResponseTypeArgument);
+      symbolManager.addSymbol(httpResponseTypeArgument);
       addFunction(funcName, requestName, httpResponseTypeArgument.getSymbol().getName(), errorTypes);
     }
   }
@@ -88,7 +91,7 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
   let js = ejs.render(
     fs.readFileSync('./template.ejs', {encoding: 'utf8'}),
     {
-      interfaces: symbols.map(a => getSource(a)),
+      interfaces: symbolManager.symbols.map(a => getSource(a)),
       functions,
     },
     {escape: e => e}
@@ -142,78 +145,6 @@ function addFunction(name: string, requestType: string, returnType: string, erro
     found: false,
     errorCode,
   });
-}
-
-const symbols: ts.Symbol[] = [];
-
-function addSymbol(type: Type<ts.Type>) {
-  for (const t of type.getIntersectionTypes()) {
-    addSymbol(t);
-  }
-  for (const t of type.getUnionTypes()) {
-    addSymbol(t);
-  }
-
-  const symbol = type.getSymbol() || type.getAliasSymbol();
-  if (!symbol) {
-    // console.log(type.getText());
-    return;
-  }
-
-  if (symbol.getName() !== '__type') {
-    if (!symbols.find(a => a === symbol.compilerSymbol)) {
-      symbols.push(symbol.compilerSymbol);
-    }
-  }
-
-  const baseTypes = type.getBaseTypes();
-
-  if (baseTypes.length > 0) {
-    for (const baseType of baseTypes) {
-      // console.log('1', baseType);
-      addSymbol(baseType);
-    }
-  }
-
-  for (const declaration of symbol.getDeclarations()) {
-    for (const t of declaration.getType().getIntersectionTypes()) {
-      addSymbol(t);
-    }
-    for (const t of declaration.getType().getUnionTypes()) {
-      addSymbol(t);
-    }
-  }
-
-  for (const member of symbol.getMembers()) {
-    // console.log(symbol.getName() + ' ' + member.getName());
-    const memberType = member.getDeclarations()[0].getType();
-    if (memberType.isArray()) {
-      switch (memberType.getTypeArguments()[0].getText()) {
-        case 'any':
-        case 'string':
-        case 'boolean':
-        case 'number':
-          break;
-        default:
-          const symbol1 = memberType.getTypeArguments()[0];
-          if (symbol1) {
-            addSymbol(symbol1);
-          }
-          break;
-      }
-    } else {
-      switch (memberType.getText()) {
-        case 'any':
-        case 'string':
-        case 'boolean':
-        case 'number':
-          break;
-        default:
-          addSymbol(memberType);
-          break;
-      }
-    }
-  }
 }
 
 function getSource(symbol: ts.Symbol, addExport: boolean = true) {

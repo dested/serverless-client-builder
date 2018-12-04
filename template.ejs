@@ -3,41 +3,45 @@ import {BaseClient} from './baseClient';
 export class Client extends BaseClient {
 <% for(const func of functions) { %>
         async <%= func.name %><TPromise=void>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
-        <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
+      try{
+    <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
 
-        const options = {
-            method: "<%= func.method%>",
-            headers: {
-                "Content-Type": "application/json",
-                "Accept": "application/json"
-            }
-        } as RequestInit;
-        <% if(func.requestType!=='void') {%>
+    const options = {
+    method: "<%= func.method%>",
+    headers: {
+    "Content-Type": "application/json",
+    "Accept": "application/json"
+    }
+    } as RequestInit;
+    <% if(func.requestType!=='void') {%>
         <% if(func.method.toUpperCase()==='GET') {%>
-        url += Object.keys(model)      .filter(a => !!(model as any)[a]).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
+            url += Object.keys(model)      .filter(a => !!(model as any)[a]).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
         <% } else {%>
-        options.body = JSON.stringify(model);
+            options.body = JSON.stringify(model);
         <% } %>
-        <% } %>
+    <% } %>
 
-        const response = await fetch(url, await this.transformOptions(options));
+    const response = await fetch(url, await this.transformOptions(options));
 
-        const status = response.status;
-        const headers: any = {};
+    const status = response.status;
+    const headers: any = {};
 
-        if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
+    if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
 
-        const responseText = await response.text();
+    const responseText = await response.text();
 
-        if (status === 200) {
-            return await handle[200](responseText === "" ? null : JSON.parse(responseText));
-        }
-        <%=func.errorCode.map(a=>`else if (status === ${a}) {
+    if (status === 200) {
+    return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+    }
+    <%=func.errorCode.map(a=>`else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('')%>
-        else {
-            await handle[500](responseText);
-        }
+    else {
+    await handle[500](responseText);
+    }
+    }catch(ex){
+    await handle[500](ex);
+    }
     }
 <% } %>
 
