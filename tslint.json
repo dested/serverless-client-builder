@@ -23,6 +23,7 @@
         }
       }
     ],
+    "no-eval": false,
     "no-console": false,
     "ban-types": false,
     "interface-over-type-literal": false,

@@ -1,42 +1,93 @@
 import * as ejs from 'ejs';
 import * as fs from 'fs';
 import * as prettier from 'prettier';
-import Project, {ScriptTarget, Symbol, ts, Type, TypeGuards} from 'ts-simple-ast';
-import * as yamljs from 'yamljs';
+import Project, {MethodDeclaration, SyntaxKind, ts, TypeGuards} from 'ts-simple-ast';
 import {ManageSymbols} from './manageSymbols';
 
 const readJson = (path: string) => {
   return JSON.parse(fs.readFileSync(require.resolve(path), {encoding: 'utf8'}));
 };
 
-function process(tsConfigFilePath: string, serverlessFilePath: string, prettierFile: string, outputFile: string) {
-  const serverlessConfig = yamljs.load(serverlessFilePath);
+function processFile(apiPath: string, outputFile: string) {
+  const tsConfigFilePath = apiPath + 'tsconfig.json';
+  const prettierFile = apiPath + '.prettierrc';
+
   const project = new Project({
     tsConfigFilePath,
   });
 
   const symbolManager = new ManageSymbols();
+  const controllerDataItems: ControllerData[] = [];
+  for (const sourceFile of project.getSourceFiles()) {
+    for (const classDeclaration of sourceFile.getDescendantsOfKind(SyntaxKind.ClassDeclaration)) {
+      if (
+        classDeclaration.getDecorators().length > 0 &&
+        classDeclaration.getDecorators()[0].getName() === 'controller'
+      ) {
+        const controllerName = classDeclaration
+          .getDecorators()[0]
+          .getArguments()[0]
+          .getText();
 
-  const h = project.getSourceFile('handler.ts');
-  /*  tsquery(h.compilerNode, '*', {visitAllChildren: true}); */
+        const controllerData: ControllerData = {name: eval(controllerName), methods: []};
+        controllerDataItems.push(controllerData);
+        for (const methodDeclaration of classDeclaration.getMethods()) {
+          if (methodDeclaration.getDecorator('request')) {
+            const methodName = methodDeclaration.getName();
+            const requestDecorator = methodDeclaration.getDecorator('request');
+            const requestMethod = eval(requestDecorator.getArguments()[0].getText());
+            const requestPath = eval(requestDecorator.getArguments()[1].getText());
+            const options: {key: string; value: string}[] = [];
+            if (requestDecorator.getArguments()[2]) {
+              const text = requestDecorator.getArguments()[2].getText();
+              const requestOptions = eval('(' + text + ')');
+              if (requestOptions) {
+                for (const key of Object.keys(requestOptions)) {
+                  options.push({key, value: requestOptions[key]});
+                }
+              }
+            }
+            controllerData.methods.push({
+              controllerName: controllerData.name,
+              name: methodName,
+              method: requestMethod,
+              path: requestPath,
+              options,
+              declaration: methodDeclaration,
+            });
+          }
+        }
+      }
+    }
+  }
 
-  const funcs = h
-    .getChildren()[0]
-    .getChildren()
-    .filter(a => a.getText().startsWith('module.exports'));
+  if (process.argv[2] === 'yml') {
+    const header = fs.readFileSync(apiPath + 'serverless-header.yml', {encoding: 'utf8'});
+    let bottom = '';
+    for (const controllerDataItem of controllerDataItems) {
+      for (const method of controllerDataItem.methods) {
+        bottom += `
+  ${method.name}:
+    handler: handler.${controllerDataItem.name}_${method.name}
+    ${method.options.map(a => `${a.key}: ${a.value}`).join('\r\n    ')}
+    events:
+      - http:
+          path: ${method.path}
+          method: ${method.method}
+          cors: true`;
+      }
+    }
+    fs.writeFileSync(apiPath + 'serverless.yml', header + bottom, {encoding: 'utf8'});
+    console.log('Wrote yml file');
+    return;
+  }
 
-  assert(funcs.length > 0, 'No module.exports found');
+  for (const controllerDataItem of controllerDataItems) {
+    for (const method of controllerDataItem.methods) {
+      const funcName = method.controllerName + 'Controller_' + method.name;
 
-  for (const func of funcs) {
-    const funcName = func
-      .getChildren()[0]
-      .getChildren()[0]
-      .getText()
-      .split('.')[2];
+      const funcNode = method.declaration;
 
-    const funcNode = func.getChildren()[0].getChildren()[2];
-    assert(TypeGuards.isArrowFunction(funcNode), 'You did not set the module.export to an arrow function');
-    if (TypeGuards.isArrowFunction(funcNode)) {
       assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
       const eventArg = funcNode.getParameters()[0].getType();
       assert(eventArg.getSymbol().getName() === 'RequestEvent', 'RequestEvent argument must be a generic event class');
@@ -71,22 +122,16 @@ function process(tsConfigFilePath: string, serverlessFilePath: string, prettierF
         }
       }
       symbolManager.addSymbol(httpResponseTypeArgument);
-      addFunction(funcName, requestName, httpResponseTypeArgument.getSymbol().getName(), errorTypes);
+      addFunction(
+        funcName,
+        requestName,
+        httpResponseTypeArgument.getSymbol().getName(),
+        errorTypes,
+        '/' + method.path,
+        method.method
+      );
     }
   }
-
-  for (const serverlessFuncName in serverlessConfig.functions) {
-    if (serverlessConfig.functions.hasOwnProperty(serverlessFuncName)) {
-      const serverlessFunc = serverlessConfig.functions[serverlessFuncName];
-      const func = functions.find(a => a.name === serverlessFunc.handler.replace('handler.', ''));
-      assert(!!func, 'Function not found in yaml ' + serverlessFuncName);
-      const http = serverlessFunc.events[0].http;
-      func.url = '/' + http.path;
-      func.method = http.method;
-      func.found = true;
-    }
-  }
-  functions = functions.filter(a => a.found);
 
   let js = ejs.render(
     fs.readFileSync('./template.ejs', {encoding: 'utf8'}),
@@ -110,8 +155,7 @@ function assert(thing: boolean, error: string) {
   }
 }
 
-let functions: {
-  found: boolean;
+const functions: {
   url: string;
   method: string;
   name: string;
@@ -126,7 +170,14 @@ function getSourceWithoutStatusCode(a: ts.Symbol) {
   return source.replace(/statusCode\s*:\s*\d+,?;?/g, '');
 }
 
-function addFunction(name: string, requestType: string, returnType: string, errorTypes: ts.Symbol[]) {
+function addFunction(
+  name: string,
+  requestType: string,
+  returnType: string,
+  errorTypes: ts.Symbol[],
+  url: string,
+  method: string
+) {
   const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
   const handleType = `{200:(result:${returnType})=>TPromise,500:(result:string)=>void,${errorTypes
     .map(a => {
@@ -140,9 +191,8 @@ function addFunction(name: string, requestType: string, returnType: string, erro
     handleType,
     requestType,
     returnType,
-    url: '',
-    method: '',
-    found: false,
+    url,
+    method,
     errorCode,
   });
 }
@@ -159,16 +209,22 @@ function getSource(symbol: ts.Symbol, addExport: boolean = true) {
     .join('\n');
 }
 
-/*process(
-  '/Users/sal/code/styr/CleverRX/api/tsconfig.json',
-  '/Users/sal/code/styr/CleverRX/api/serverless.yml',
-  '/Users/sal/code/styr/CleverRX/api/.prettierrc',
+export interface ControllerData {
+  name: string;
+  methods: ControllerMethodData[];
+}
+export interface ControllerMethodData {
+  controllerName: string;
+  name: string;
+  method: string;
+  path: string;
+  options: {key: string; value: string}[];
+  declaration: MethodDeclaration;
+}
+
+/*processFile(
+  '/Users/sal/code/styr/CleverRX/api/',
   '/Users/sal/code/styr/CleverRX/app/src/dataServices/app.generated.ts'
 );*/
 
-process(
-  'c:/code/CleverRX/api/tsconfig.json',
-  'c:/code/CleverRX/api/serverless.yml',
-  'c:/code/CleverRX/api/.prettierrc',
-  'c:/code/CleverRX/app/src/dataServices/app.generated.ts'
-);
+processFile('c:/code/CleverRX/api/', 'c:/code/CleverRX/app/src/dataServices/app.generated.ts');
