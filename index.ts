@@ -29,17 +29,17 @@ function processFile(apiPath: string, outputFile: string) {
           .getArguments()[0]
           .getText();
 
-        const controllerData: ControllerData = {name: eval(controllerName), methods: []};
+        const controllerData: ControllerData = {name: eval(controllerName), methods: [], events: []};
         controllerDataItems.push(controllerData);
-        for (const methodDeclaration of classDeclaration.getMethods()) {
-          if (methodDeclaration.getDecorator('request')) {
-            const methodName = methodDeclaration.getName();
-            const requestDecorator = methodDeclaration.getDecorator('request');
-            const requestMethod = eval(requestDecorator.getArguments()[0].getText());
-            const requestPath = eval(requestDecorator.getArguments()[1].getText());
+        for (const declaration of classDeclaration.getMethods()) {
+          if (declaration.getDecorator('request')) {
+            const name = declaration.getName();
+            const decorator = declaration.getDecorator('request');
+            const method = eval(decorator.getArguments()[0].getText());
+            const path = eval(decorator.getArguments()[1].getText());
             const options: {key: string; value: string}[] = [];
-            if (requestDecorator.getArguments()[2]) {
-              const text = requestDecorator.getArguments()[2].getText();
+            if (decorator.getArguments()[2]) {
+              const text = decorator.getArguments()[2].getText();
               const requestOptions = eval('(' + text + ')');
               if (requestOptions) {
                 for (const key of Object.keys(requestOptions)) {
@@ -49,11 +49,22 @@ function processFile(apiPath: string, outputFile: string) {
             }
             controllerData.methods.push({
               controllerName: controllerData.name,
-              name: methodName,
-              method: requestMethod,
-              path: requestPath,
+              name,
+              method,
+              path,
               options,
-              declaration: methodDeclaration,
+              declaration,
+            });
+          }
+          if (declaration.getDecorator('event')) {
+            const methodName = declaration.getName();
+            const decorator = declaration.getDecorator('event');
+            const rate = eval(decorator.getArguments()[0].getText());
+            controllerData.events.push({
+              controllerName: controllerData.name,
+              name: methodName,
+              rate,
+              declaration,
             });
           }
         }
@@ -75,6 +86,13 @@ function processFile(apiPath: string, outputFile: string) {
           path: ${method.path}
           method: ${method.method}
           cors: true`;
+      }
+      for (const event of controllerDataItem.events) {
+        bottom += `
+  ${event.name}:
+    handler: handler.${controllerDataItem.name}_${event.name}
+    events:
+      - schedule: ${event.rate}`;
       }
     }
     fs.writeFileSync(apiPath + 'serverless.yml', header + bottom, {encoding: 'utf8'});
@@ -123,6 +141,7 @@ function processFile(apiPath: string, outputFile: string) {
       }
       symbolManager.addSymbol(httpResponseTypeArgument);
       addFunction(
+        method.controllerName,
         funcName,
         requestName,
         httpResponseTypeArgument.getSymbol().getName(),
@@ -156,6 +175,7 @@ function assert(thing: boolean, error: string) {
 }
 
 const functions: {
+  controllerName: string;
   url: string;
   method: string;
   name: string;
@@ -171,6 +191,7 @@ function getSourceWithoutStatusCode(a: ts.Symbol) {
 }
 
 function addFunction(
+  controllerName: string,
   name: string,
   requestType: string,
   returnType: string,
@@ -187,6 +208,7 @@ function addFunction(
     })
     .join(',')}}`;
   functions.push({
+    controllerName,
     name,
     handleType,
     requestType,
@@ -212,6 +234,7 @@ function getSource(symbol: ts.Symbol, addExport: boolean = true) {
 export interface ControllerData {
   name: string;
   methods: ControllerMethodData[];
+  events: ControllerEventData[];
 }
 export interface ControllerMethodData {
   controllerName: string;
@@ -219,6 +242,12 @@ export interface ControllerMethodData {
   method: string;
   path: string;
   options: {key: string; value: string}[];
+  declaration: MethodDeclaration;
+}
+export interface ControllerEventData {
+  controllerName: string;
+  name: string;
+  rate: string;
   declaration: MethodDeclaration;
 }
 
