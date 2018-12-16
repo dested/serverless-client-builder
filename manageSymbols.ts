@@ -48,6 +48,7 @@ export class ManageSymbols {
         switch (memberType.getTypeArguments()[0].getText()) {
           case 'any':
           case 'string':
+          case 'Date':
           case 'boolean':
           case 'number':
             break;
@@ -62,6 +63,7 @@ export class ManageSymbols {
         switch (memberType.getText()) {
           case 'any':
           case 'string':
+          case 'Date':
           case 'boolean':
           case 'number':
             break;
