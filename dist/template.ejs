@@ -5,7 +5,7 @@ import {BaseClient} from './baseClient';
 <% for(const controller of controllers) { %>
 export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>Client extends BaseClient {
 <% for(const func of controller.functions) { %>
-        async <%= func.name %><TPromise=void>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
+        async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
       try{
     <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
 
@@ -34,7 +34,10 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
     const responseText = await response.text();
 
     if (status === 200) {
-    return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+        if(handle[200]){
+            return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+        }
+        return JSON.parse(responseText)
     }
     <%=func.errorCode.map(a=>`else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
@@ -43,7 +46,7 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
     await handle[500](responseText);
     }
     }catch(ex){
-    await handle[500](ex);
+    await handle[500](ex.toString());
     }
     }
 <% } %>
