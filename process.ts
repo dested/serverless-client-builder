@@ -26,43 +26,70 @@ export function processFile(apiPath: string, outputFile: string) {
           .getArguments()[0]
           .getText();
 
-        const controllerData: ControllerData = {name: eval(controllerName), methods: [], events: []};
+        const controllerData: ControllerData = {
+          name: eval(controllerName),
+          methods: [],
+          websockets: [],
+          events: [],
+        };
+
         controllerDataItems.push(controllerData);
         for (const declaration of classDeclaration.getMethods()) {
-          if (declaration.getDecorator('request')) {
-            const name = declaration.getName();
-            const decorator = declaration.getDecorator('request');
-            const method = eval(decorator.getArguments()[0].getText());
-            const path = eval(decorator.getArguments()[1].getText());
-            const options: {key: string; value: string}[] = [];
-            if (decorator.getArguments()[2]) {
-              const text = decorator.getArguments()[2].getText();
-              const requestOptions = eval('(' + text + ')');
-              if (requestOptions) {
-                for (const key of Object.keys(requestOptions)) {
-                  options.push({key, value: requestOptions[key]});
+          for (const decorator of declaration.getDecorators()) {
+            if (decorator.getName() === 'request') {
+              const name = declaration.getName();
+              const method = eval(decorator.getArguments()[0].getText());
+              const path = eval(decorator.getArguments()[1].getText());
+              const options: {key: string; value: string}[] = [];
+              if (decorator.getArguments()[2]) {
+                const text = decorator.getArguments()[2].getText();
+                const requestOptions = eval('(' + text + ')');
+                if (requestOptions) {
+                  for (const key of Object.keys(requestOptions)) {
+                    options.push({key, value: requestOptions[key]});
+                  }
                 }
               }
+              controllerData.methods.push({
+                controllerName: controllerData.name,
+                name,
+                method,
+                path,
+                options,
+                declaration,
+              });
             }
-            controllerData.methods.push({
-              controllerName: controllerData.name,
-              name,
-              method,
-              path,
-              options,
-              declaration,
-            });
-          }
-          if (declaration.getDecorator('event')) {
-            const methodName = declaration.getName();
-            const decorator = declaration.getDecorator('event');
-            const rate = eval(decorator.getArguments()[0].getText());
-            controllerData.events.push({
-              controllerName: controllerData.name,
-              name: methodName,
-              rate,
-              declaration,
-            });
+            if (decorator.getName() === 'event') {
+              const methodName = declaration.getName();
+              const rate: string = eval(decorator.getArguments()[0].getText());
+
+              const data = controllerData.events.find(a => a.name === methodName);
+              if (data) {
+                data.rate.push(rate);
+              } else {
+                controllerData.events.push({
+                  controllerName: controllerData.name,
+                  name: methodName,
+                  rate: [rate],
+                  declaration,
+                });
+              }
+            }
+            if (decorator.getName() === 'websocket') {
+              const methodName = declaration.getName();
+              const routeKey: string = eval(decorator.getArguments()[0].getText());
+              const data = controllerData.websockets.find(a => a.name === methodName);
+              if (data) {
+                data.routeKey.push(routeKey);
+              } else {
+                controllerData.websockets.push({
+                  controllerName: controllerData.name,
+                  name: methodName,
+                  routeKey: [routeKey],
+                  declaration,
+                });
+              }
+            }
           }
         }
       }
@@ -83,12 +110,21 @@ export function processFile(apiPath: string, outputFile: string) {
           method: ${method.method}
           cors: true`;
     }
+
     for (const event of controllerDataItem.events) {
       bottom += `
-  ${event.name}:
+  ${controllerDataItem.name}_${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
     events:
-      - schedule: ${event.rate}`;
+${event.rate.map(a => `      - schedule: ${a}`).join('\r\n')}`;
+    }
+
+    for (const websocket of controllerDataItem.websockets) {
+      bottom += `
+  ${controllerDataItem.name}_${websocket.name}:
+    handler: handler.${controllerDataItem.name}_${websocket.name}
+    events:
+${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).join('\r\n')}`;
     }
   }
   const disclaimer = '# This file was generated by https://github.com/dested/serverless-client-builder\r\n';
@@ -246,6 +282,7 @@ export interface ControllerData {
   name: string;
   methods: ControllerMethodData[];
   events: ControllerEventData[];
+  websockets: ControllerWebsocketData[];
 }
 export interface ControllerMethodData {
   controllerName: string;
@@ -258,6 +295,13 @@ export interface ControllerMethodData {
 export interface ControllerEventData {
   controllerName: string;
   name: string;
-  rate: string;
+  rate: string[];
+  declaration: MethodDeclaration;
+}
+
+export interface ControllerWebsocketData {
+  controllerName: string;
+  name: string;
+  routeKey: string[];
   declaration: MethodDeclaration;
 }
