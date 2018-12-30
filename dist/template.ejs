@@ -5,9 +5,9 @@ import {BaseClient} from './baseClient';
 <% for(const controller of controllers) { %>
 export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>Client extends BaseClient {
 <% for(const func of controller.functions) { %>
-        async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
-      try{
-    <%= func.method.toUpperCase()==='GET' && func.requestType!=='void'?'let':'const' %> url = this.baseUrl + '<%= func.url %>?';
+    async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
+    try{
+    let url = this.baseUrl + '<%= func.url %>?';
 
     const options = {
     method: "<%= func.method%>",
@@ -24,6 +24,10 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
         <% } %>
     <% } %>
 
+    <% for(let u=0;u<func.urlReplaces.length;u++) {%>
+    url = url.replace('{<%=func.urlReplaces[u]%>}',model.<%=func.urlReplaces[u]%>);
+    <% } %>
+
     const response = await fetch(url, await this.transformOptions(options));
 
     const status = response.status;
@@ -34,10 +38,10 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
     const responseText = await response.text();
 
     if (status === 200) {
-        if(handle[200]){
-            return await handle[200](responseText === "" ? null : JSON.parse(responseText));
-        }
-        return JSON.parse(responseText)
+    if(handle[200]){
+    return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+    }
+    return JSON.parse(responseText)
     }
     <%=func.errorCode.map(a=>`else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
@@ -49,13 +53,13 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
     await handle[500](ex.toString());
     }
     }
-<% } %>
+    <% } %>
 
-}
-<% } %>
+    }
+    <% } %>
 
 
 
-<% for(const interface of interfaces) { %>
-    <%= interface %>
-<% } %>
+    <% for(const interface of interfaces) { %>
+        <%= interface %>
+    <% } %>

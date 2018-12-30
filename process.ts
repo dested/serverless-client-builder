@@ -1,3 +1,4 @@
+import {match} from '@phenomnomnominal/tsquery/dist/src/match';
 import * as ejs from 'ejs';
 import * as fs from 'fs';
 import * as prettier from 'prettier';
@@ -75,7 +76,7 @@ export function processFile(apiPath: string, outputFile: string) {
                 });
               }
             }
-            if (decorator.getName() === 'websocket') {
+            if (decorator.getName() === 'websocketRequest') {
               const methodName = declaration.getName();
               const routeKey: string = eval(decorator.getArguments()[0].getText());
               const data = controllerData.websockets.find(a => a.name === methodName);
@@ -189,6 +190,7 @@ ${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).
     },
     {escape: e => e}
   );
+  fs.writeFileSync(outputFile, js, {encoding: 'utf8'});
 
   const prettierFile = apiPath + '.prettierrc';
   const prettierOptions = readJson(prettierFile);
@@ -222,6 +224,7 @@ const controllers: {
     requestType: string;
     returnType: string;
     errorCode: string[];
+    urlReplaces: string[];
     handleType: string;
   }[];
 }[] = [];
@@ -255,15 +258,31 @@ function addFunction(
     controllers.push(controller);
   }
 
+  const urlReplaces = matchAll(/{(\w+)}/g, url);
   controller.functions.push({
     name,
     handleType,
     requestType,
     returnType,
     url,
+    urlReplaces,
     method,
     errorCode,
   });
+}
+
+function matchAll(re: RegExp, str: string) {
+  let m;
+
+  const results: string[] = [];
+
+  do {
+    m = re.exec(str);
+    if (m) {
+      results.push(m[1]);
+    }
+  } while (m);
+  return results;
 }
 
 function getSource(symbol: ts.Symbol, addExport: boolean = true) {
