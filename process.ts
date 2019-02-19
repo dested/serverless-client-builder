@@ -113,7 +113,7 @@ export function processFile(apiPath: string, outputFile: string, legacyUrl: stri
       mainServerless += `
   ${controllerDataItem.name}_${method.name}:
     handler: handler.${controllerDataItem.name}_${method.name}
-    ${method.options.map(a => `${a.key}: ${a.value}`).join('\r\n    ')}    events:
+${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}      events:
       - http:
           path: ${extendedUrl ? `${controllerDataItem.name}/` : ''}${method.path}
           method: ${method.method}
@@ -122,7 +122,7 @@ export function processFile(apiPath: string, outputFile: string, legacyUrl: stri
       controllerServerless += `
   ${controllerDataItem.name}_${method.name}:
     handler: handler.${controllerDataItem.name}_${method.name}
-    ${method.options.map(a => `${a.key}: ${a.value}`).join('\r\n    ')}    events:
+${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}    events:
       - http:
           path: /${method.path}
           method: ${method.method}
