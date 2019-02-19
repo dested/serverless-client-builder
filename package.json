@@ -8,7 +8,7 @@
     "debug": "node --inspect-brk -r ts-node/register index.ts  --in c:\\code\\double-dates\\api2\\ --out c:\\code\\double-dates\\app2/src/dataServices/app.generated.ts",
     "test": "node -r ts-node/register tester",
     "debug-test": "node --inspect-brk -r ts-node/register tester.ts",
-    "install-local": "tsc && npm install -g c:\\code\\serverless-client"
+    "install-local": "tsc && npm install -g ./"
   },
   "preferGlobal": true,
   "bin": {
