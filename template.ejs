@@ -3,7 +3,10 @@
 import {BaseClient} from './baseClient';
 
 <% for(const controller of controllers) { %>
-export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>Client extends BaseClient {
+export class <%=controller.controllerName.replace(/(\-\w)/g, (m)=>m[1].toUpperCase()).replace(/^\w/, c => c.toUpperCase())%>Client extends BaseClient {
+constructor(getJwt:()=>string){
+super(getJwt);
+}
 <% for(const func of controller.functions) { %>
     async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
     try{
@@ -18,7 +21,13 @@ export class <%=controller.controllerName.replace(/^\w/, c => c.toUpperCase())%>
     } as RequestInit;
     <% if(func.requestType!=='void') {%>
         <% if(func.method.toUpperCase()==='GET') {%>
-            url += Object.keys(model)      .filter(a => !!(model as any)[a]).map(key => `${key}=${encodeURIComponent((model as any)[key])}`).join('&');
+            url += Object.keys(model)
+            .filter(key => !!(model as any)[key])
+            <% for(let u=0;u<func.urlReplaces.length;u++) {%>
+            .filter(key => key!=='<%=func.urlReplaces[u]%>')
+            <% } %>
+            .map(key => `${key}=${encodeURIComponent((model as any)[key])}`)
+            .join('&');
         <% } else {%>
             options.body = JSON.stringify(model);
         <% } %>

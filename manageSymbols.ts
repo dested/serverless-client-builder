@@ -16,6 +16,7 @@ export class ManageSymbols {
       // console.log(type.getText());
       return;
     }
+
     if (symbol.getDeclaredType()) {
       if (symbol.getDeclaredType().isEnumLiteral()) {
         if (symbol.getName() !== 'EventCategory') {

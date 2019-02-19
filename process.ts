@@ -5,8 +5,8 @@ import * as prettier from 'prettier';
 import Project, {MethodDeclaration, SyntaxKind, ts} from 'ts-simple-ast';
 import {ManageSymbols} from './manageSymbols';
 
-export function processFile(apiPath: string, outputFile: string) {
-  const extendedUrl = true;
+export function processFile(apiPath: string, outputFile: string, legacyUrl: string) {
+  const extendedUrl = !legacyUrl;
 
   const tsConfigFilePath = apiPath + 'tsconfig.json';
 
