@@ -4,6 +4,9 @@ export class ManageSymbols {
   symbols: ts.Symbol[] = [];
 
   addSymbol(type: Type<ts.Type>) {
+    if ((type as any).intrinsicName === 'void') {
+      return;
+    }
     for (const t of type.getIntersectionTypes()) {
       this.addSymbol(t);
     }

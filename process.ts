@@ -32,6 +32,7 @@ export function processFile(apiPath: string, outputFile: string, legacyUrl: stri
           name: eval(controllerName),
           methods: [],
           websockets: [],
+          websocketEvents: [],
           events: [],
         };
 
@@ -92,6 +93,16 @@ export function processFile(apiPath: string, outputFile: string, legacyUrl: stri
                 });
               }
             }
+            if (decorator.getName() === 'websocketEvent') {
+              const methodName = declaration.getName();
+              const routeKey: string = eval(decorator.getArguments()[0].getText());
+              controllerData.websocketEvents.push({
+                controllerName: controllerData.name,
+                name: methodName,
+                routeKey,
+                declaration,
+              });
+            }
           }
         }
       }
@@ -148,12 +159,12 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n')}`;
   ${controllerDataItem.name}_${websocket.name}:
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
-${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).join('\r\n')}`;
+${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
       controllerServerless += `
   ${websocket.name}:
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
-${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).join('\r\n')}`;
+${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
     }
 
     if (microService) {
@@ -216,6 +227,50 @@ ${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).
         method.method
       );
     }
+    for (const websocket of controllerDataItem.websockets) {
+      if (websocket.routeKey.find(a => a[0] === '$')) {
+        continue;
+      }
+
+      const funcName = websocket.name;
+      const funcNode = websocket.declaration;
+
+      assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
+      const eventArg = funcNode.getParameters()[0].getType();
+      assert(
+        eventArg.getSymbol().getName() === 'WebsocketRequestEvent',
+        'WebsocketRequestEvent argument must be a generic event class'
+      );
+      const typeArgument = eventArg.getTypeArguments()[0];
+      let requestName: string;
+      if (typeArgument.getText() !== 'void') {
+        symbolManager.addSymbol(typeArgument);
+        requestName = typeArgument.getSymbol().getName();
+      } else {
+        requestName = 'void';
+      }
+      addWebsocketFunction(websocket.controllerName, funcName, requestName, websocket.routeKey[0]);
+    }
+    for (const websocketEvent of controllerDataItem.websocketEvents) {
+      const funcName = websocketEvent.name;
+      const funcNode = websocketEvent.declaration;
+
+      assert(funcNode.getParameters().length === 3, 'The export must only have three parameters');
+      const eventArg = funcNode.getParameters()[2].getType();
+      assert(
+        eventArg.getSymbol().getName() === 'WebSocketEvent',
+        'WebSocketEvent argument must be a generic event class'
+      );
+      const typeArgument = eventArg.getTypeArguments()[0];
+      let requestName: string;
+      if (typeArgument.getText() !== 'void') {
+        symbolManager.addSymbol(typeArgument);
+        requestName = typeArgument.getSymbol().getName();
+      } else {
+        requestName = 'void';
+      }
+      addWebsocketEvent(websocketEvent.controllerName, funcName, requestName, websocketEvent.routeKey);
+    }
   }
   let js = ejs.render(
     fs.readFileSync(require.resolve('./template.ejs'), {encoding: 'utf8'}),
@@ -262,6 +317,16 @@ const controllers: {
     urlReplaces: string[];
     handleType: string;
   }[];
+  websocketFunctions: {
+    route: string;
+    name: string;
+    requestType: string;
+  }[];
+  websocketEvents: {
+    route: string;
+    name: string;
+    requestType: string;
+  }[];
 }[] = [];
 
 function getSourceWithoutStatusCode(a: ts.Symbol) {
@@ -289,7 +354,7 @@ function addFunction(
 
   let controller = controllers.find(a => a.controllerName === controllerName);
   if (!controller) {
-    controller = {controllerName, functions: []};
+    controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
     controllers.push(controller);
   }
 
@@ -303,6 +368,30 @@ function addFunction(
     urlReplaces,
     method,
     errorCode,
+  });
+}
+function addWebsocketFunction(controllerName: string, name: string, requestType: string, route: string) {
+  let controller = controllers.find(a => a.controllerName === controllerName);
+  if (!controller) {
+    controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
+    controllers.push(controller);
+  }
+  controller.websocketFunctions.push({
+    name,
+    requestType,
+    route,
+  });
+}
+function addWebsocketEvent(controllerName: string, name: string, requestType: string, route: string) {
+  let controller = controllers.find(a => a.controllerName === controllerName);
+  if (!controller) {
+    controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
+    controllers.push(controller);
+  }
+  controller.websocketEvents.push({
+    name,
+    requestType,
+    route,
   });
 }
 
@@ -343,6 +432,7 @@ export interface ControllerData {
   methods: ControllerMethodData[];
   events: ControllerEventData[];
   websockets: ControllerWebsocketData[];
+  websocketEvents: ControllerWebsocketEventData[];
 }
 export interface ControllerMethodData {
   controllerName: string;
@@ -363,5 +453,12 @@ export interface ControllerWebsocketData {
   controllerName: string;
   name: string;
   routeKey: string[];
+  declaration: MethodDeclaration;
+}
+
+export interface ControllerWebsocketEventData {
+  controllerName: string;
+  name: string;
+  routeKey: string;
   declaration: MethodDeclaration;
 }

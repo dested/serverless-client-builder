@@ -3,12 +3,50 @@
 import {BaseClient} from './baseClient';
 
 <% for(const controller of controllers) { %>
-export class <%=controller.controllerName.replace(/(\-\w)/g, (m)=>m[1].toUpperCase()).replace(/^\w/, c => c.toUpperCase())%>Client extends BaseClient {
-constructor(getJwt:()=>string){
-super(getJwt);
-}
-<% for(const func of controller.functions) { %>
-    async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
+    <%const name=controller.controllerName.replace(/(\-\w)/g, (m)=>m[1].toUpperCase()).replace(/^\w/, c => c.toUpperCase())%>
+    export class <%=name%>Client extends BaseClient {
+    constructor(getJwt:()=>string){
+    super(getJwt);
+    }
+
+    <%if(controller.websocketFunctions.length+controller.websocketEvents.length>0){%>
+    private socket: WebSocket;
+    connect(events: <%=name%>Events) {
+    this.socket = new WebSocket(this.websocketUrl);
+    this.socket.onmessage = message => {
+    const response=JSON.parse(message.data);
+    switch(response.event){
+    <% for(const ev of controller.websocketEvents) { %>
+    case '<%=ev.route%>':
+    events.<%=ev.name.replace('send','on')%> && events.<%=ev.name.replace('send','on')%>(response.data);
+    break;
+    <%}%>
+    }
+    console.log(message.data);
+    };
+    this.socket.onclose = e => {
+    console.log(e);
+    events.onDisconnect && events.onDisconnect();
+    };
+    this.socket.onopen = e => {
+    console.log(e);
+    events.onConnect && events.onConnect();
+    };
+    }
+    <%}%>
+    <% for(const func of controller.websocketFunctions) { %>
+    <%=func.name%>(request: <%=func.requestType%>): void {
+    this.socket.send(
+    JSON.stringify({
+    action: '<%=func.route%>',
+    data: request,
+    })
+    );
+    }
+    <% } %>
+
+    <% for(const func of controller.functions) { %>
+        async <%= func.name %><TPromise=<%= func.returnType %>>(<%= func.requestType==='void'?'':`model: ${func.requestType}`%>,handle:<%=func.handleType%>) :Promise<TPromise>{
     try{
     let url = this.baseUrl + '<%= func.url %>?';
 
@@ -65,6 +103,14 @@ super(getJwt);
     <% } %>
 
     }
+
+
+    <%if(controller.websocketFunctions.length+controller.websocketEvents.length>0){%>
+    export interface <%=name%>Events{
+    <% for(const ev of controller.websocketEvents) { %><%=ev.name.replace('send','on')%>?:(req:<%=ev.requestType%>)=>void;<%}%>onDisconnect?:()=>void;onConnect?:()=>void;
+    }
+    <%}%>
+
     <% } %>
 
 
