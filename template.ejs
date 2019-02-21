@@ -33,12 +33,16 @@ import {BaseClient} from './baseClient';
     events.onConnect && events.onConnect();
     };
     }
+    disconnect(){
+    this.socket && this.socket.close();
+    }
     <%}%>
     <% for(const func of controller.websocketFunctions) { %>
     <%=func.name%>(request: <%=func.requestType%>): void {
-    this.socket.send(
+    this.socket && this.socket.send(
     JSON.stringify({
     action: '<%=func.route%>',
+    jwt:this.getJwt(),
     data: request,
     })
     );

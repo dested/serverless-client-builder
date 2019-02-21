@@ -258,7 +258,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
       assert(funcNode.getParameters().length === 3, 'The export must only have three parameters');
       const eventArg = funcNode.getParameters()[2].getType();
       assert(
-        eventArg.getSymbol().getName() === 'WebSocketEvent',
+        eventArg.getSymbol().getName() === 'WebSocketResponse',
         'WebSocketEvent argument must be a generic event class'
       );
       const typeArgument = eventArg.getTypeArguments()[0];
