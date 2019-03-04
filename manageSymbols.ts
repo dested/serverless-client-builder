@@ -2,6 +2,7 @@ import {ts, Type} from 'ts-simple-ast';
 
 export class ManageSymbols {
   symbols: ts.Symbol[] = [];
+  types: Type<ts.Type>[] = [];
 
   addSymbol(type: Type<ts.Type>) {
     if ((type as any).intrinsicName === 'void') {
@@ -31,6 +32,7 @@ export class ManageSymbols {
     if (symbol.getName() !== '__type') {
       if (!this.symbols.find(a => a === symbol.compilerSymbol)) {
         this.symbols.push(symbol.compilerSymbol);
+        this.types.push(type);
       }
     }
 
