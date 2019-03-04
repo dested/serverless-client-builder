@@ -10,4 +10,5 @@ export interface SomeRequest {
 export interface SomeRequestAnswer {
   answerId: string;
   decision: 'positive' | 'negative';
+  shoes: {foo?: number};
 }
