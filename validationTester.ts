@@ -1,31 +1,13 @@
-import * as fs from 'fs';
-import * as prettier from 'prettier';
 import Project, {SourceFile, ts, Type} from 'ts-simple-ast';
-import {ManageSymbols} from './manageSymbols';
 
-export class Harness {
-  start(path: string) {
-    const project = new Project({tsConfigFilePath: './tsconfig.json'});
-    return project.getSourceFile(path);
+export const validationMethods: string[] = [];
+
+const methodNames: string[] = [];
+export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
+  if (methodNames.find(a => a === name)) {
+    return;
   }
-
-  equal(source: SourceFile, symbolManager: ManageSymbols) {
-    const left = source.getFullText().replace(/\s/g, '');
-    const right = symbolManager.getSource().replace(/\s/g, '');
-    if (left !== right) {
-      console.log(source.getFullText());
-      console.log('--------');
-      console.log(symbolManager.getSource());
-    }
-    return left === right;
-  }
-}
-
-const tests = fs.readdirSync('./validation-tests');
-const harness = new Harness();
-const methods: string[] = [];
-
-function buildValidator(name: string, symbol: Type<ts.Type>) {
+  methodNames.push(name);
   const method = `
   static ${name}Validator(model: any):boolean {
     let fieldCount=0;
@@ -38,8 +20,9 @@ function buildValidator(name: string, symbol: Type<ts.Type>) {
       .getProperties()
       .map(a => {
         const fieldName = a.getName();
+        console.log(name, fieldName);
         let type = a.getDeclarations()[0].getType();
-        let typeText = type.getText();
+        let typeText = type.getText(null, 1);
         const results: string[] = [];
         let optional = false;
         if ((a.getValueDeclaration() as any).getQuestionTokenNode()) {
@@ -72,13 +55,13 @@ function buildValidator(name: string, symbol: Type<ts.Type>) {
         }
 
         if (typeText.startsWith('{') && typeText.endsWith('}')) {
-          buildValidator(name + '_' + fieldName, type);
-          results.push(`this.${name + '_' + fieldName}Validator(${variable});`);
+          buildValidatorMethod(fieldName, type);
+          results.push(`this.${fieldName}Validator(${variable});`);
         } else {
           if (!type.isBoolean() && type.getUnionTypes().length > 0) {
             const unionConditional: string[] = [];
             for (const unionType of type.getUnionTypes()) {
-              switch (unionType.getText()) {
+              switch (unionType.getText(null, 1)) {
                 case 'string':
                   unionConditional.push(`typeof ${variable} !== 'string'`);
                   break;
@@ -90,12 +73,12 @@ function buildValidator(name: string, symbol: Type<ts.Type>) {
                   break;
                 default:
                   if (
-                    (unionType.getText().startsWith("'") && unionType.getText().endsWith("'")) ||
-                    (unionType.getText().startsWith('"') && unionType.getText().endsWith('"'))
+                    (unionType.getText(null, 1).startsWith("'") && unionType.getText(null, 1).endsWith("'")) ||
+                    (unionType.getText(null, 1).startsWith('"') && unionType.getText(null, 1).endsWith('"'))
                   ) {
-                    unionConditional.push(`${variable}!==${unionType.getText()}`);
+                    unionConditional.push(`${variable}!==${unionType.getText(null, 1)}`);
                   } else {
-                    unionConditional.push(`this.${unionType.getText()}Validator(${variable})`);
+                    unionConditional.push(`this.${unionType.getText(null, 1)}Validator(${variable})`);
                   }
                   break;
               }
@@ -120,10 +103,17 @@ function buildValidator(name: string, symbol: Type<ts.Type>) {
                   `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
                 );
                 break;
+              case 'any':
+/*
+                results.push(
+                  `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                );
+*/
+                break;
               default:
-                buildValidator(name + '_' + typeText, type);
+                buildValidatorMethod(typeText, type);
 
-                results.push(`this.${name + '_' + typeText}Validator(${variable})`);
+                results.push(`this.${typeText}Validator(${variable})`);
                 break;
             }
           }
@@ -143,8 +133,9 @@ function buildValidator(name: string, symbol: Type<ts.Type>) {
       return true;
       } 
   `;
-  methods.push(method);
+  validationMethods.push(method);
 }
+/*
 
 for (const test of tests) {
   const source = harness.start(`./validation-tests/${test}`);
@@ -153,17 +144,17 @@ for (const test of tests) {
 
   console.log(symbolManager.getSource());
 
-  buildValidator(symbolManager.types[0].getSymbol().getName(), symbolManager.types[0]);
+  buildValidatorMethod(symbolManager.types[0].getSymbol().getName(), symbolManager.types[0]);
   let js = `
-/* This file was generated by https://github.com/dested/serverless-client-builder */
-/* tslint:disable */
-  
-  
+/!* This file was generated by https://github.com/dested/serverless-client-builder *!/
+/!* tslint:disable *!/
+
+
 export class ValidationError {
 constructor(public model: string, reason: 'missing' | 'mismatch'|'too-many-fields', field: string) {}
 }
 export class RequestValidator {
-${methods.join('\r\n')}
+${validationMethods.join('\r\n')}
 }
 `;
 
@@ -184,3 +175,4 @@ function readJson(path: string) {
   }
   return null;
 }
+*/

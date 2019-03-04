@@ -4,15 +4,15 @@ export class ManageSymbols {
   symbols: ts.Symbol[] = [];
   types: Type<ts.Type>[] = [];
 
-  addSymbol(type: Type<ts.Type>) {
+  addSymbol(type: Type<ts.Type>, topLevel: boolean) {
     if ((type as any).intrinsicName === 'void') {
       return;
     }
     for (const t of type.getIntersectionTypes()) {
-      this.addSymbol(t);
+      this.addSymbol(t, false);
     }
     for (const t of type.getUnionTypes()) {
-      this.addSymbol(t);
+      this.addSymbol(t, false);
     }
 
     const symbol = type.getSymbol() || type.getAliasSymbol();
@@ -32,7 +32,9 @@ export class ManageSymbols {
     if (symbol.getName() !== '__type') {
       if (!this.symbols.find(a => a === symbol.compilerSymbol)) {
         this.symbols.push(symbol.compilerSymbol);
-        this.types.push(type);
+        if (topLevel) {
+          this.types.push(type);
+        }
       }
     }
 
@@ -41,16 +43,16 @@ export class ManageSymbols {
     if (baseTypes.length > 0) {
       for (const baseType of baseTypes) {
         // console.log('1', baseType);
-        this.addSymbol(baseType);
+        this.addSymbol(baseType, false);
       }
     }
 
     for (const declaration of symbol.getDeclarations()) {
       for (const t of declaration.getType().getIntersectionTypes()) {
-        this.addSymbol(t);
+        this.addSymbol(t, false);
       }
       for (const t of declaration.getType().getUnionTypes()) {
-        this.addSymbol(t);
+        this.addSymbol(t, false);
       }
     }
 
@@ -68,7 +70,7 @@ export class ManageSymbols {
           default:
             const symbol1 = memberType.getTypeArguments()[0];
             if (symbol1) {
-              this.addSymbol(symbol1);
+              this.addSymbol(symbol1, false);
             }
             break;
         }
@@ -81,7 +83,7 @@ export class ManageSymbols {
           case 'number':
             break;
           default:
-            this.addSymbol(memberType);
+            this.addSymbol(memberType, false);
             break;
         }
       }
