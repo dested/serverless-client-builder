@@ -440,6 +440,14 @@ export class RequestValidator {
     if (model === null) throw new ValidationError('HttpEventViewCommonLocation', 'missing', '');
     if (typeof model !== 'object') throw new ValidationError('HttpEventViewCommonLocation', 'mismatch', '');
 
+    if (model.coordinates === null) throw new ValidationError('HttpEventViewCommonLocation', 'missing', 'coordinates');
+    fieldCount++;
+    if (typeof model.coordinates[0] !== 'number')
+      throw new ValidationError('HttpEventViewCommonLocation', 'mismatch', 'coordinates');
+    if (typeof model.coordinates[1] !== 'number')
+      throw new ValidationError('HttpEventViewCommonLocation', 'mismatch', 'coordinates');
+    if (typeof model.coordinates[2] !== undefined)
+      throw new ValidationError('HttpEventViewCommonLocation', 'mismatch', 'coordinates');
     if (model.locationName === null)
       throw new ValidationError('HttpEventViewCommonLocation', 'missing', 'locationName');
     fieldCount++;
@@ -518,6 +526,18 @@ export class RequestValidator {
     this.HttpRelationshipPublicValidator(model.relationship);
     if (model.category === null) throw new ValidationError('HttpEventViewPrivate', 'missing', 'category');
     fieldCount++;
+    if (
+      this.EventCategory.FoodValidator(model.category) &&
+      this.EventCategory.DrinkValidator(model.category) &&
+      this.EventCategory.ActiveValidator(model.category) &&
+      this.EventCategory.CreativeValidator(model.category) &&
+      this.EventCategory.MusicValidator(model.category) &&
+      this.EventCategory.EventValidator(model.category) &&
+      this.EventCategory.IntellectualValidator(model.category) &&
+      this.EventCategory.ConversationValidator(model.category) &&
+      this.EventCategory.CoffeeValidator(model.category)
+    )
+      throw new ValidationError('HttpEventViewPrivate', 'mismatch', 'category');
     if (model.location === null) throw new ValidationError('HttpEventViewPrivate', 'missing', 'location');
     fieldCount++;
     this.HttpEventViewCommonLocationValidator(model.location);
@@ -570,16 +590,6 @@ export class RequestValidator {
     return true;
   }
 
-  static anyValidator(model: any): boolean {
-    let fieldCount = 0;
-    if (model === null) throw new ValidationError('any', 'missing', '');
-    if (typeof model !== 'object') throw new ValidationError('any', 'mismatch', '');
-
-    if (Object.keys(model).length !== fieldCount) throw new ValidationError('any', 'too-many-fields', '');
-
-    return true;
-  }
-
   static PatchItemValidator(model: any): boolean {
     let fieldCount = 0;
     if (model === null) throw new ValidationError('PatchItem', 'missing', '');
@@ -594,7 +604,6 @@ export class RequestValidator {
     if (typeof model.path !== 'string') throw new ValidationError('PatchItem', 'mismatch', 'path');
     if (model.value === null) throw new ValidationError('PatchItem', 'missing', 'value');
     fieldCount++;
-    this.anyValidator(model.value);
 
     if (Object.keys(model).length !== fieldCount) throw new ValidationError('PatchItem', 'too-many-fields', '');
 

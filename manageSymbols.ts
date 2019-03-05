@@ -12,6 +12,9 @@ export class ManageSymbols {
       this.addSymbol(t, false);
     }
     for (const t of type.getUnionTypes()) {
+      if (t.isEnumLiteral()) {
+        continue;
+      }
       this.addSymbol(t, false);
     }
 
@@ -20,14 +23,15 @@ export class ManageSymbols {
       // console.log(type.getText());
       return;
     }
-
+/*
     if (symbol.getDeclaredType()) {
       if (symbol.getDeclaredType().isEnumLiteral()) {
         if (symbol.getName() !== 'EventCategory') {
+          debugger;
           return;
         }
       }
-    }
+    }*/
 
     if (symbol.getName() !== '__type') {
       if (!this.symbols.find(a => a === symbol.compilerSymbol)) {
@@ -52,6 +56,9 @@ export class ManageSymbols {
         this.addSymbol(t, false);
       }
       for (const t of declaration.getType().getUnionTypes()) {
+        if (t.isEnumLiteral()) {
+          continue;
+        }
         this.addSymbol(t, false);
       }
     }

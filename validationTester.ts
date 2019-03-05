@@ -86,6 +86,45 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
             results.push(
               `if (${unionConditional.join('&&')}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
             );
+          } else if (type.getTupleElements().length > 0) {
+            let ind = 0;
+            for (const tupleElement of type.getTupleElements()) {
+              typeText = tupleElement.getText();
+              const v = variable + '[' + ind + ']';
+              switch (typeText) {
+                case 'string':
+                  results.push(
+                    `if (typeof ${v} !== 'string') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                  );
+                  break;
+                case 'number':
+                  results.push(
+                    `if (typeof ${v} !== 'number') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                  );
+                  break;
+                case 'boolean':
+                  results.push(
+                    `if (typeof ${v} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                  );
+                  break;
+                case 'any':
+                  /*
+                          results.push(
+                            `if (typeof ${v} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                          );
+          */
+                  break;
+                default:
+                  buildValidatorMethod(typeText, type);
+
+                  results.push(`this.${typeText}Validator(${v})`);
+                  break;
+              }
+              ind++;
+            }
+            results.push(
+              `if (typeof ${variable}[${ind}] !== undefined) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+            );
           } else {
             switch (typeText) {
               case 'string':
@@ -104,7 +143,7 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
                 );
                 break;
               case 'any':
-/*
+                /*
                 results.push(
                   `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
                 );
