@@ -25,7 +25,7 @@ const harness = new Harness();
 for (const test of tests) {
   const source = harness.start(`./tests/${test}`);
   const symbolManager = new ManageSymbols();
-  symbolManager.addSymbol(source.getExportedDeclarations()[0].getType());
+  symbolManager.addSymbol(source.getExportedDeclarations()[0].getType(), true);
   if (harness.equal(source, symbolManager)) {
     console.log(`${test} Passed`);
   } else {
@@ -33,3 +33,5 @@ for (const test of tests) {
   }
   break;
 }
+
+

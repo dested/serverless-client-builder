@@ -3,13 +3,15 @@ import Project, {SourceFile, ts, Type} from 'ts-simple-ast';
 export const validationMethods: string[] = [];
 
 const methodNames: string[] = [];
-export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
+export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type<ts.Type>) {
   if (methodNames.find(a => a === name)) {
     return;
   }
   methodNames.push(name);
+
+  // console.log(name);
   const method = `
-  static ${name}Validator(model: any):boolean {
+  static validate${name}(model: ${fullType}):boolean {
     let fieldCount=0;
     if(model===null)
       throw new ValidationError('${name}', 'missing', '');
@@ -20,7 +22,7 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
       .getProperties()
       .map(a => {
         const fieldName = a.getName();
-        console.log(name, fieldName);
+        // console.log(name, fieldName);
         let type = a.getDeclarations()[0].getType();
         let typeText = type.getText(null, 1);
         const results: string[] = [];
@@ -55,37 +57,50 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
         }
 
         if (typeText.startsWith('{') && typeText.endsWith('}')) {
-          buildValidatorMethod(fieldName, type);
-          results.push(`this.${fieldName}Validator(${variable});`);
+          buildValidatorMethod(apiFullPath, fieldName, typeText, type);
+          results.push(`this.validate${fieldName}(${variable});`);
         } else {
           if (!type.isBoolean() && type.getUnionTypes().length > 0) {
-            const unionConditional: string[] = [];
-            for (const unionType of type.getUnionTypes()) {
-              switch (unionType.getText(null, 1)) {
-                case 'string':
-                  unionConditional.push(`typeof ${variable} !== 'string'`);
-                  break;
-                case 'number':
-                  unionConditional.push(`typeof ${variable} !== 'number'`);
-                  break;
-                case 'boolean':
-                  unionConditional.push(`typeof ${variable} !== 'boolean'`);
-                  break;
-                default:
-                  if (
-                    (unionType.getText(null, 1).startsWith("'") && unionType.getText(null, 1).endsWith("'")) ||
-                    (unionType.getText(null, 1).startsWith('"') && unionType.getText(null, 1).endsWith('"'))
-                  ) {
-                    unionConditional.push(`${variable}!==${unionType.getText(null, 1)}`);
-                  } else {
-                    unionConditional.push(`this.${unionType.getText(null, 1)}Validator(${variable})`);
-                  }
-                  break;
+            if (type.getUnionTypes().find(b => b.isEnumLiteral())) {
+              const unionConditional: string[] = [];
+              for (const unionType of type.getUnionTypes()) {
+                unionConditional.push(`${variable} !== '${(unionType.compilerType as any).value}'`);
               }
+              results.push(
+                `if (${unionConditional.join('&&')}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+              );
+            } else {
+              const unionConditional: string[] = [];
+              for (const unionType of type.getUnionTypes()) {
+                switch (unionType.getText(null, 1)) {
+                  case 'string':
+                    unionConditional.push(`typeof ${variable} !== 'string'`);
+                    break;
+                  case 'number':
+                    unionConditional.push(`typeof ${variable} !== 'number'`);
+                    break;
+                  case 'boolean':
+                    unionConditional.push(`typeof ${variable} !== 'boolean'`);
+                    break;
+                  case 'Date':
+                    console.log('date isnt super supported');
+                    break;
+                  default:
+                    if (
+                      (unionType.getText(null, 1).startsWith("'") && unionType.getText(null, 1).endsWith("'")) ||
+                      (unionType.getText(null, 1).startsWith('"') && unionType.getText(null, 1).endsWith('"'))
+                    ) {
+                      unionConditional.push(`${variable}!==${unionType.getText(null, 1)}`);
+                    } else {
+                      unionConditional.push(`this.${unionType.getText(null, 1)}Validator(${variable})`);
+                    }
+                    break;
+                }
+              }
+              results.push(
+                `if (${unionConditional.join('&&')}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+              );
             }
-            results.push(
-              `if (${unionConditional.join('&&')}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
-            );
           } else if (type.getTupleElements().length > 0) {
             let ind = 0;
             for (const tupleElement of type.getTupleElements()) {
@@ -107,6 +122,9 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
                     `if (typeof ${v} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
                   );
                   break;
+                case 'Date':
+                  console.log('date isnt super supported');
+                  break;
                 case 'any':
                   /*
                           results.push(
@@ -115,15 +133,15 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
           */
                   break;
                 default:
-                  buildValidatorMethod(typeText, type);
+                  buildValidatorMethod(apiFullPath, typeText, type.getText().replace(apiFullPath, '..'), type);
 
-                  results.push(`this.${typeText}Validator(${v})`);
+                  results.push(`this.validate${typeText}(${v})`);
                   break;
               }
               ind++;
             }
             results.push(
-              `if (typeof ${variable}[${ind}] !== undefined) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+              `if (typeof (${variable} as any)[${ind}] !== undefined) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
             );
           } else {
             switch (typeText) {
@@ -142,6 +160,9 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
                   `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
                 );
                 break;
+              case 'Date':
+                console.log('date isnt super supported');
+                break;
               case 'any':
                 /*
                 results.push(
@@ -150,9 +171,9 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
 */
                 break;
               default:
-                buildValidatorMethod(typeText, type);
+                buildValidatorMethod(apiFullPath, typeText, type.getText().replace(apiFullPath, '..'), type);
 
-                results.push(`this.${typeText}Validator(${variable})`);
+                results.push(`this.validate${typeText}(${variable})`);
                 break;
             }
           }
@@ -174,6 +195,7 @@ export function buildValidatorMethod(name: string, symbol: Type<ts.Type>) {
   `;
   validationMethods.push(method);
 }
+
 /*
 
 for (const test of tests) {
