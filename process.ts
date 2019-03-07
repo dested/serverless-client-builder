@@ -9,7 +9,7 @@ import {buildValidatorMethod, validationMethods} from './validationTester';
 
 const requestSymbolManager = new ManageSymbols();
 
-export function processFile(apiPath: string, outputFile: string, legacyUrl: string, microService: string) {
+export function processFile(apiPath: string, outputFiles: string[], legacyUrl: string, microService: string) {
   const extendedUrl = !legacyUrl;
 
   const tsConfigFilePath = apiPath + 'tsconfig.json';
@@ -289,16 +289,16 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
     },
     {escape: e => e}
   );
-  fs.writeFileSync(outputFile, js, {encoding: 'utf8'});
 
   const prettierFile = apiPath + '.prettierrc';
   const prettierOptions = readJson(prettierFile);
   if (prettierOptions) {
     js = prettier.format(js, prettierOptions);
   }
-  // console.log(js);
 
-  fs.writeFileSync(outputFile, js, {encoding: 'utf8'});
+  for (const outputFile of outputFiles) {
+    fs.writeFileSync(outputFile, js, {encoding: 'utf8'});
+  }
 
   buildValidator(apiPath);
 }
@@ -319,7 +319,7 @@ const readJson = (path: string) => {
 function buildValidator(apiPath: string) {
   for (const type of requestSymbolManager.types) {
     const declaredType = type.getSymbol().getDeclaredType();
-    const apiFullPath = fs.realpathSync(apiPath);
+    const apiFullPath = fs.realpathSync(apiPath).replace(/\\/g, '/');
     const text = declaredType.getText().replace(apiFullPath, '..');
     buildValidatorMethod(apiFullPath, type.getSymbol().getName(), text, type);
   }
@@ -329,8 +329,9 @@ function buildValidator(apiPath: string) {
   
 
 export class ValidationError extends Error {
-  constructor(public model: string, reason: 'missing' | 'mismatch' | 'too-many-fields', field: string) {
-    super()
+  isValidationError=true;
+  constructor(public model: string, public reason: 'missing' | 'mismatch' | 'too-many-fields', public field: string) {
+    super();
   }
 }
   

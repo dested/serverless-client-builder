@@ -41,11 +41,12 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
 
         if (!optional) {
           results.push(`if (${variable} === null) throw new ValidationError('${name}', 'missing', '${fieldName}');`);
+          results.push(`fieldCount++;`);
         } else {
           results.push(`if ('${fieldName}' in model) {`);
+          results.push(`fieldCount++;`);
+          results.push(`if (model.${fieldName}!==null) {`);
         }
-
-        results.push(`fieldCount++;`);
 
         if (isArray) {
           results.push(
@@ -141,7 +142,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
               ind++;
             }
             results.push(
-              `if (typeof (${variable} as any)[${ind}] !== undefined) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+              `if (typeof (${variable} as any)[${ind}] !== 'undefined') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
             );
           } else {
             switch (typeText) {
@@ -182,6 +183,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           results.push(`}`);
         }
         if (optional) {
+          results.push(`}`);
           results.push(`}`);
         }
         return results.join('\r\n');

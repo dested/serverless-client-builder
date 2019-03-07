@@ -5,7 +5,7 @@ import * as yargs from 'yargs';
 import {processFile} from './process';
 
 const inArg = yargs.argv.in as any;
-const outArg = yargs.argv.out as any;
+const outArg = (yargs.argv.out as any).split(',');
 if (yargs.argv.syncPackage) {
   const outerPackage = JSON.parse(fs.readFileSync(inArg + 'package.json', {encoding: 'utf8'}));
   const dirs = fs.readdirSync(inArg + '/controllers');
