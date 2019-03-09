@@ -12,7 +12,7 @@ import {BaseClient,ControllerOptions} from './baseClient';
     <% if(controller.websocketFunctions.length + controller.websocketEvents.length > 0){ %>
         private socket: WebSocket;
         connect(events: <%= name %>Events) {
-        this.socket = new WebSocket(this.websocketUrl);
+        this.socket = new WebSocket(this.options.baseUrl);
         this.socket.onmessage = message => {
         const response=JSON.parse(message.data);
         switch(response.event){
@@ -53,7 +53,7 @@ import {BaseClient,ControllerOptions} from './baseClient';
         async <%= func.name %>
         <TPromise=<%= func.returnType %>>(<%= func.requestType === 'void' ? '' : `model: ${func.requestType}` %>,handle:<%= func.handleType %>) :Promise<TPromise>{
     try{
-    let url = this.baseUrl + '<%= func.url %>?';
+    let url = this.options.baseUrl + '<%= func.url %>?';
 
     const options = {
     method: "<%= func.method %>",

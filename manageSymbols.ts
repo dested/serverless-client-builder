@@ -5,7 +5,7 @@ export class ManageSymbols {
   types: Type<ts.Type>[] = [];
 
   addSymbol(type: Type<ts.Type>, topLevel: boolean) {
-    if ((type as any).intrinsicName === 'void') {
+    if ((type.compilerType as any).intrinsicName === 'void') {
       return;
     }
     for (const t of type.getIntersectionTypes()) {
@@ -23,15 +23,6 @@ export class ManageSymbols {
       // console.log(type.getText());
       return;
     }
-/*
-    if (symbol.getDeclaredType()) {
-      if (symbol.getDeclaredType().isEnumLiteral()) {
-        if (symbol.getName() !== 'EventCategory') {
-          debugger;
-          return;
-        }
-      }
-    }*/
 
     if (symbol.getName() !== '__type') {
       if (!this.symbols.find(a => a === symbol.compilerSymbol)) {
@@ -39,6 +30,8 @@ export class ManageSymbols {
         if (topLevel) {
           this.types.push(type);
         }
+      } else {
+        return;
       }
     }
 
@@ -67,7 +60,9 @@ export class ManageSymbols {
       // console.log(symbol.getName() + ' ' + member.getName());
       const memberType = member.getDeclarations()[0].getType();
       if (memberType.isArray()) {
-        switch (memberType.getTypeArguments()[0].getText()) {
+        const typeArgument = memberType.getTypeArguments()[0];
+
+        switch (typeArgument.getSymbol() && typeArgument.getSymbol().getEscapedName()) {
           case 'any':
           case 'string':
           case 'Date':
@@ -75,14 +70,14 @@ export class ManageSymbols {
           case 'number':
             break;
           default:
-            const symbol1 = memberType.getTypeArguments()[0];
+            const symbol1 = typeArgument;
             if (symbol1) {
               this.addSymbol(symbol1, false);
             }
             break;
         }
       } else {
-        switch (memberType.getText()) {
+        switch (memberType.getSymbol() && memberType.getSymbol().getEscapedName()) {
           case 'any':
           case 'string':
           case 'Date':

@@ -4,8 +4,8 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "start": "node -r ts-node/register index --in /Users/sal/code/double-dates/api/ --out /Users/sal/code/double-dates/app/src/dataServices/app.generated.ts  --micro true",
-    "debug": "node --inspect-brk -r ts-node/register index.ts  --in /Users/sal/code/double-dates/api/ --out /Users/sal/code/double-dates/app/src/dataServices/app.generated.ts --micro true",
+    "start": "node -r ts-node/register index --in c:\\code\\double-dates\\api\\ --out c:\\code\\double-dates\\app/src/dataServices/app.generated.ts --micro true",
+    "debug": "node --inspect-brk -r ts-node/register index.ts  --in c:\\code\\double-dates\\api\\ --out c:\\code\\double-dates\\admin/src/dataServices/app.generated.ts --micro true",
     "debug-validation": "node --inspect-brk -r ts-node/register validationTester.ts",
     "test": "node -r ts-node/register tester",
     "debug-test": "node --inspect-brk -r ts-node/register tester.ts",

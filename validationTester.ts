@@ -3,6 +3,7 @@ import Project, {SourceFile, ts, Type} from 'ts-simple-ast';
 export const validationMethods: string[] = [];
 
 const methodNames: string[] = [];
+
 export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type<ts.Type>) {
   if (methodNames.find(a => a === name)) {
     return;
@@ -20,14 +21,14 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
     
     ${symbol
       .getProperties()
-      .map(a => {
-        const fieldName = a.getName();
+      .map(property => {
+        const fieldName = property.getName();
         // console.log(name, fieldName);
-        let type = a.getDeclarations()[0].getType();
+        let type = property.getDeclarations()[0].getType();
         let typeText = type.getText(null, 1);
         const results: string[] = [];
         let optional = false;
-        if ((a.getValueDeclaration() as any).getQuestionTokenNode()) {
+        if (property.getValueDeclaration() && (property.getValueDeclaration() as any).getQuestionTokenNode()) {
           optional = true;
         }
 
@@ -61,10 +62,11 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           buildValidatorMethod(apiFullPath, fieldName, typeText, type);
           results.push(`this.validate${fieldName}(${variable});`);
         } else {
-          if (!type.isBoolean() && type.getUnionTypes().length > 0) {
-            if (type.getUnionTypes().find(b => b.isEnumLiteral())) {
+          const unionTypes = type.getUnionTypes();
+          if (!type.isBoolean() && unionTypes.length > 0) {
+            if (unionTypes.find(b => b.isEnumLiteral())) {
               const unionConditional: string[] = [];
-              for (const unionType of type.getUnionTypes()) {
+              for (const unionType of unionTypes) {
                 unionConditional.push(`${variable} !== '${(unionType.compilerType as any).value}'`);
               }
               results.push(
@@ -72,35 +74,62 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
               );
             } else {
               const unionConditional: string[] = [];
-              for (const unionType of type.getUnionTypes()) {
-                switch (unionType.getText(null, 1)) {
-                  case 'string':
-                    unionConditional.push(`typeof ${variable} !== 'string'`);
-                    break;
-                  case 'number':
-                    unionConditional.push(`typeof ${variable} !== 'number'`);
-                    break;
-                  case 'boolean':
-                    unionConditional.push(`typeof ${variable} !== 'boolean'`);
-                    break;
-                  case 'Date':
-                    console.log('date isnt super supported');
-                    break;
-                  default:
-                    if (
-                      (unionType.getText(null, 1).startsWith("'") && unionType.getText(null, 1).endsWith("'")) ||
-                      (unionType.getText(null, 1).startsWith('"') && unionType.getText(null, 1).endsWith('"'))
-                    ) {
-                      unionConditional.push(`${variable}!==${unionType.getText(null, 1)}`);
-                    } else {
-                      unionConditional.push(`this.${unionType.getText(null, 1)}Validator(${variable})`);
-                    }
-                    break;
+
+              if (unionTypes.every(a => a.getSymbol() && a.getSymbol().getEscapedName() === '__type')) {
+                const keyValues = findCommonUnionKey(unionTypes);
+
+                for (const keyValue of keyValues) {
+                  const methodName =
+                    name + '_' + fieldName + '_' + keyValue.key + '_' + keyValue.value.replace(/["-_ ]/g, '');
+                  buildValidatorMethod(
+                    apiFullPath,
+                    methodName,
+                    keyValue.type.getText().replace(apiFullPath, '..'),
+                    keyValue.type
+                  );
+                  unionConditional.push(
+                    `(${variable}.${keyValue.key}===${keyValue.value} && this.validate${methodName}(${variable}))`
+                  );
                 }
+                results.push(
+                  `if (!(${unionConditional.join(
+                    '||'
+                  )})) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                );
+              } else {
+                for (const unionType of unionTypes) {
+                  const unionTypeText = unionType.getText(null, 1);
+                  switch (unionTypeText) {
+                    case 'string':
+                      unionConditional.push(`typeof ${variable} !== 'string'`);
+                      break;
+                    case 'number':
+                      unionConditional.push(`typeof ${variable} !== 'number'`);
+                      break;
+                    case 'boolean':
+                      unionConditional.push(`typeof ${variable} !== 'boolean'`);
+                      break;
+                    case 'Date':
+                      console.log('date isnt super supported');
+                      break;
+                    default:
+                      if (
+                        (unionTypeText.startsWith("'") && unionTypeText.endsWith("'")) ||
+                        (unionTypeText.startsWith('"') && unionTypeText.endsWith('"'))
+                      ) {
+                        unionConditional.push(`${variable}!==${unionTypeText}`);
+                      } else {
+                        unionConditional.push(`this.validate${unionTypeText}(${variable})`);
+                      }
+                      break;
+                  }
+                }
+                results.push(
+                  `if (${unionConditional.join(
+                    '&&'
+                  )}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+                );
               }
-              results.push(
-                `if (${unionConditional.join('&&')}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
-              );
             }
           } else if (type.getTupleElements().length > 0) {
             let ind = 0;
@@ -172,9 +201,16 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
 */
                 break;
               default:
-                buildValidatorMethod(apiFullPath, typeText, type.getText().replace(apiFullPath, '..'), type);
+                if (
+                  (typeText.startsWith("'") && typeText.endsWith("'")) ||
+                  (typeText.startsWith('"') && typeText.endsWith('"'))
+                ) {
+                  `if (${variable}!==${typeText}) throw new ValidationError('${name}', 'mismatch', '${fieldName}');`;
+                } else {
+                  buildValidatorMethod(apiFullPath, typeText, type.getText().replace(apiFullPath, '..'), type);
 
-                results.push(`this.validate${typeText}(${variable})`);
+                  results.push(`this.validate${typeText}(${variable})`);
+                }
                 break;
             }
           }
@@ -196,6 +232,33 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
       } 
   `;
   validationMethods.push(method);
+}
+
+function findCommonUnionKey(unionTypes: Type[]) {
+  const firstUnionType = unionTypes[0];
+  let key: string;
+  for (const property of firstUnionType.getProperties()) {
+    if (unionTypes.every(a => !!a.getProperty(property.getName()))) {
+      key = property.getName();
+      break;
+    }
+  }
+  if (!key) {
+    throw new Error('No common key in union');
+  }
+  const items: {key: string; value: string; type: Type}[] = [];
+  for (const unionType of unionTypes) {
+    items.push({
+      key,
+      value: unionType
+        .getProperty(key)
+        .getValueDeclaration()
+        .getType()
+        .getText(),
+      type: unionType,
+    });
+  }
+  return items;
 }
 
 /*
