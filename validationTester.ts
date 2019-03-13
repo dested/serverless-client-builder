@@ -46,7 +46,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
         } else {
           results.push(`if ('${fieldName}' in model) {`);
           results.push(`fieldCount++;`);
-          results.push(`if (model.${fieldName}!==null) {`);
+          results.push(`if (model.${fieldName}!==null && model.${fieldName}!==undefined) {`);
         }
 
         if (isArray) {

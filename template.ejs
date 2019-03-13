@@ -22,14 +22,11 @@ import {BaseClient,ControllerOptions} from './baseClient';
             break;
         <% } %>
         }
-        console.log(message.data);
         };
         this.socket.onclose = e => {
-        console.log(e);
         events.onDisconnect && events.onDisconnect();
         };
         this.socket.onopen = e => {
-        console.log(e);
         events.onConnect && events.onConnect();
         };
         }

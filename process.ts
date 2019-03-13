@@ -201,7 +201,10 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
 
       assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
       const eventArg = funcNode.getParameters()[0].getType();
-      assert(eventArg.getSymbol().getName() === 'RequestEvent', 'RequestEvent argument must be a generic event class');
+      assert(
+        eventArg.getSymbol().getName() === 'RequestEvent' || eventArg.getSymbol().getName() === 'GetRequestEvent',
+        'RequestEvent argument must be a generic event class'
+      );
       const typeArgument = eventArg.getTypeArguments()[0];
       let requestName: string;
 
@@ -267,8 +270,11 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
       const funcName = websocketEvent.name;
       const funcNode = websocketEvent.declaration;
 
-      assert(funcNode.getParameters().length === 2, 'The export must only have two parameters');
-      const eventArg = funcNode.getParameters()[1].getType();
+      assert(
+        funcNode.getParameters().length === 3,
+        `The export must only have three parameters: ${websocketEvent.name} ${funcNode.getParameters().length}`
+      );
+      const eventArg = funcNode.getParameters()[2].getType();
       assert(
         eventArg.getSymbol().getName() === 'WebSocketResponse',
         'WebSocketEvent argument must be a generic event class'
@@ -308,7 +314,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
   console.timeEnd('write template');
 
   console.time('validator');
-  buildValidator(apiPath);
+  // buildValidator(apiPath);
   console.timeEnd('validator');
 }
 
