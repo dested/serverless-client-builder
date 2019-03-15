@@ -73,10 +73,21 @@ export function processFile(apiPath: string, outputFiles: string[], legacyUrl: s
               const rate: string = eval(decorator.getArguments()[0].getText());
 
               const data = controllerData.events.find(a => a.name === methodName);
+              const options: {key: string; value: string}[] = [];
+              if (decorator.getArguments()[1]) {
+                const text = decorator.getArguments()[1].getText();
+                const requestOptions = eval('(' + text + ')');
+                if (requestOptions) {
+                  for (const key of Object.keys(requestOptions)) {
+                    options.push({key, value: requestOptions[key]});
+                  }
+                }
+              }
               if (data) {
                 data.rate.push(rate);
               } else {
                 controllerData.events.push({
+                  options,
                   controllerName: controllerData.name,
                   name: methodName,
                   rate: [rate],
@@ -156,13 +167,13 @@ ${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    
       mainServerless += `
   ${controllerDataItem.name}_${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
-    events:
+${event.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
 ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
 
       controllerServerless += `
   ${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
-    events:
+${event.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
 ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
     }
 
@@ -314,7 +325,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
   console.timeEnd('write template');
 
   console.time('validator');
-  // buildValidator(apiPath);
+  buildValidator(apiPath);
   console.timeEnd('validator');
 }
 
@@ -512,6 +523,7 @@ export interface ControllerEventData {
   controllerName: string;
   name: string;
   rate: string[];
+  options: {key: string; value: string}[];
   declaration: MethodDeclaration;
 }
 

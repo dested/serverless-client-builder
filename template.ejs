@@ -48,7 +48,7 @@ import {BaseClient,ControllerOptions} from './baseClient';
 
     <% for(const func of controller.functions) { %>
         async <%= func.name %>
-        <TPromise=<%= func.returnType %>>(<%= func.requestType === 'void' ? '' : `model: ${func.requestType}` %>,handle:<%= func.handleType %>) :Promise<TPromise>{
+        <TPromise=<%= func.returnType %>>(<%= func.requestType === 'void' ? '' : `model: ${func.requestType}` %>,handle:<%= func.handleType %>) :Promise<TPromise|undefined>{
     try{
     let url = this.options.baseUrl + '<%= func.url %>?';
 
