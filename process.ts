@@ -113,14 +113,14 @@ export function processFile(apiPath: string, outputFile: string, legacyUrl: stri
       mainServerless += `
   ${controllerDataItem.name}_${method.name}:
     handler: handler.${controllerDataItem.name}_${method.name}
-${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}      events:
+${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}    events:
       - http:
           path: ${extendedUrl ? `${controllerDataItem.name}/` : ''}${method.path}
           method: ${method.method}
           cors: true`;
 
       controllerServerless += `
-  ${controllerDataItem.name}_${method.name}:
+  ${method.name}:
     handler: handler.${controllerDataItem.name}_${method.name}
 ${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}    events:
       - http:
@@ -137,7 +137,7 @@ ${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n')}    events:
 ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n')}`;
 
       controllerServerless += `
-  ${controllerDataItem.name}_${event.name}:
+  ${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
     events:
 ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n')}`;
@@ -150,7 +150,7 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n')}`;
     events:
 ${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).join('\r\n')}`;
       controllerServerless += `
-  ${controllerDataItem.name}_${websocket.name}:
+  ${websocket.name}:
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
 ${websocket.routeKey.map(a => `      - websocket:\r\n          routeKey: ${a}`).join('\r\n')}`;
