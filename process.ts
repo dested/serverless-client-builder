@@ -9,8 +9,7 @@ import {buildValidatorMethod, validationMethods} from './validationTester';
 
 const requestSymbolManager = new ManageSymbols();
 
-export function processFile(apiPath: string, outputFiles: string[], legacyUrl: string, microService: string) {
-  const extendedUrl = !legacyUrl;
+export function processFile(apiPath: string, outputFiles: string[]) {
   console.time('parse');
   const tsConfigFilePath = apiPath + 'tsconfig.json';
 
@@ -25,14 +24,10 @@ export function processFile(apiPath: string, outputFiles: string[], legacyUrl: s
   const controllerDataItems: ControllerData[] = [];
   for (const sourceFile of project.getSourceFiles()) {
     for (const classDeclaration of sourceFile.getDescendantsOfKind(SyntaxKind.ClassDeclaration)) {
-      if (
-        classDeclaration.getDecorators().length > 0 &&
-        classDeclaration.getDecorators()[0].getName() === 'controller'
-      ) {
-        const controllerName = classDeclaration
-          .getDecorators()[0]
-          .getArguments()[0]
-          .getText();
+      const classDecorator = classDeclaration.getDecorators()[0];
+
+      if (classDecorator && classDecorator.getName() === 'controller') {
+        const controllerName = classDecorator.getArguments()[0].getText();
 
         const controllerData: ControllerData = {
           name: eval(controllerName),
@@ -40,8 +35,18 @@ export function processFile(apiPath: string, outputFiles: string[], legacyUrl: s
           websockets: [],
           websocketEvents: [],
           events: [],
+          options: [],
         };
 
+        if (classDecorator.getArguments()[1]) {
+          const text = classDecorator.getArguments()[1].getText();
+          const requestOptions = eval('(' + text + ')');
+          if (requestOptions) {
+            for (const key of Object.keys(requestOptions)) {
+              controllerData.options.push({key, value: requestOptions[key]});
+            }
+          }
+        }
         controllerDataItems.push(controllerData);
         for (const declaration of classDeclaration.getMethods()) {
           for (const decorator of declaration.getDecorators()) {
@@ -49,22 +54,12 @@ export function processFile(apiPath: string, outputFiles: string[], legacyUrl: s
               const name = declaration.getName();
               const method = eval(decorator.getArguments()[0].getText());
               const path = eval(decorator.getArguments()[1].getText());
-              const options: {key: string; value: string}[] = [];
-              if (decorator.getArguments()[2]) {
-                const text = decorator.getArguments()[2].getText();
-                const requestOptions = eval('(' + text + ')');
-                if (requestOptions) {
-                  for (const key of Object.keys(requestOptions)) {
-                    options.push({key, value: requestOptions[key]});
-                  }
-                }
-              }
+
               controllerData.methods.push({
                 controllerName: controllerData.name,
                 name,
                 method,
                 path,
-                options,
                 declaration,
               });
             }
@@ -134,44 +129,39 @@ export function processFile(apiPath: string, outputFiles: string[], legacyUrl: s
   const websocketHeader = fs.existsSync(apiPath + 'serverless-websocket-header.yml')
     ? fs.readFileSync(apiPath + 'serverless-websocket-header.yml', {encoding: 'utf8'})
     : 'error';
+  const cronHeader = fs.existsSync(apiPath + 'serverless-cron-header.yml')
+    ? fs.readFileSync(apiPath + 'serverless-cron-header.yml', {encoding: 'utf8'})
+    : 'error';
 
   let mainServerless = disclaimer + header;
   for (const controllerDataItem of controllerDataItems) {
-    let controllerServerless =
-      disclaimer +
-      (controllerDataItem.websockets.length > 0 ? websocketHeader : header)
-        .replace(/service: (.+)\r*\n/, (a, b) => `service: ${b}-${controllerDataItem.name}\r\n`)
-        .replace("basePath: ''", `basePath: '${controllerDataItem.name}'`);
-
-    for (const method of controllerDataItem.methods) {
-      mainServerless += `
-  ${controllerDataItem.name}_${method.name}:
-    handler: handler.${controllerDataItem.name}_${method.name}
-${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
+    mainServerless += `
+  ${controllerDataItem.name}:
+    handler: handler.${controllerDataItem.name}
+${controllerDataItem.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
       - http:
-          path: ${extendedUrl ? `${controllerDataItem.name}/` : ''}${method.path}
-          method: ${method.method}
-          cors: true`;
-
-      controllerServerless += `
-  ${method.name}:
-    handler: handler.${controllerDataItem.name}_${method.name}
-${method.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
+          path: ${controllerDataItem.name}
+          method: any
+          cors: 
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - timezone
       - http:
-          path: /${method.path}
-          method: ${method.method}
-          cors: true`;
-    }
+          path: ${controllerDataItem.name}/{any+}
+          method: any
+          cors: 
+            origin: '*'
+            headers:
+              - Content-Type
+              - Authorization
+              - timezone
+`;
 
     for (const event of controllerDataItem.events) {
       mainServerless += `
   ${controllerDataItem.name}_${event.name}:
-    handler: handler.${controllerDataItem.name}_${event.name}
-${event.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
-${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
-
-      controllerServerless += `
-  ${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
 ${event.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
 ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
@@ -183,19 +173,6 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
 ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
-      controllerServerless += `
-  ${websocket.name}:
-    handler: handler.${controllerDataItem.name}_${websocket.name}
-    events:
-${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
-    }
-
-    if (microService) {
-      fs.writeFileSync(
-        `${apiPath}controllers/${kebabToCamel(controllerDataItem.name)}Controller/serverless.yml`,
-        controllerServerless,
-        {encoding: 'utf8'}
-      );
     }
   }
   fs.writeFileSync(apiPath + 'serverless.yml', mainServerless, {encoding: 'utf8'});
@@ -251,7 +228,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
         requestName,
         httpResponseTypeArgument.getSymbol().getName(),
         errorTypes,
-        '/' + (extendedUrl ? `${controllerDataItem.name}/` : '') + method.path,
+        `/${controllerDataItem.name}/${method.path}`,
         method.method
       );
     }
@@ -509,6 +486,7 @@ export interface ControllerData {
   methods: ControllerMethodData[];
   events: ControllerEventData[];
   websockets: ControllerWebsocketData[];
+  options: {key: string; value: string}[];
   websocketEvents: ControllerWebsocketEventData[];
 }
 export interface ControllerMethodData {
@@ -516,7 +494,6 @@ export interface ControllerMethodData {
   name: string;
   method: string;
   path: string;
-  options: {key: string; value: string}[];
   declaration: MethodDeclaration;
 }
 export interface ControllerEventData {
