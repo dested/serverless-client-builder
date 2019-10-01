@@ -23,6 +23,9 @@ export class ManageSymbols {
       // console.log(type.getText());
       return;
     }
+    if (symbol.getName() === 'ObjectID' || symbol.getName() === 'ObjectId') {
+      return;
+    }
 
     if (symbol.getName() !== '__type') {
       if (!this.symbols.find(a => a === symbol.compilerSymbol)) {

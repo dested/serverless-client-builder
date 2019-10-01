@@ -10,7 +10,7 @@ import {BaseClient,ControllerOptions} from './baseClient';
     }
 
     <% if(controller.websocketFunctions.length + controller.websocketEvents.length > 0){ %>
-        private socket: WebSocket;
+        private socket?: WebSocket;
         connect(events: <%= name %>Events) {
         this.socket = new WebSocket(this.options.baseUrl);
         this.socket.onmessage = message => {

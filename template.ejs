@@ -10,7 +10,7 @@ import {BaseClient,ControllerOptions} from './baseClient';
     }
 
     <% if(controller.websocketFunctions.length + controller.websocketEvents.length > 0){ %>
-        private socket: WebSocket;
+        private socket?: WebSocket;
         connect(events: <%= name %>Events) {
         this.socket = new WebSocket(this.options.baseUrl);
         this.socket.onmessage = message => {
@@ -49,79 +49,79 @@ import {BaseClient,ControllerOptions} from './baseClient';
     <% for(const func of controller.functions) { %>
         async <%= func.name %>
         <TPromise=<%= func.returnType %>>(<%= func.requestType === 'void' ? '' : `model: ${func.requestType}` %>,handle:<%= func.handleType %>) :Promise<TPromise|undefined>{
-    try{
-    let url = this.options.baseUrl + '<%= func.url %>?';
+        try{
+        let url = this.options.baseUrl + '<%= func.url %>?';
 
-    const options = {
-    method: "<%= func.method %>",
-    headers: {
-    "Content-Type": "application/json",
-    "Accept": "application/json"
-    }
-    } as RequestInit;
-    <% if(func.requestType !== 'void') { %>
-        <% if(func.method.toUpperCase() === 'GET') { %>
-            url += Object.keys(model)
-            .filter(key => !!(model as any)[key])
-            <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
-                .filter(key => key!=='<%= func.urlReplaces[u] %>')
+        const options = {
+        method: "<%= func.method %>",
+        headers: {
+        "Content-Type": "application/json",
+        "Accept": "application/json"
+        }
+        } as RequestInit;
+        <% if(func.requestType !== 'void') { %>
+            <% if(func.method.toUpperCase() === 'GET') { %>
+                url += Object.keys(model)
+                .filter(key => !!(model as any)[key])
+                <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
+                    .filter(key => key!=='<%= func.urlReplaces[u] %>')
+                <% } %>
+                .map(key => `${key}=${encodeURIComponent((model as any)[key])}`)
+                .join('&');
+            <% } else { %>
+                options.body = JSON.stringify(model);
             <% } %>
-            .map(key => `${key}=${encodeURIComponent((model as any)[key])}`)
-            .join('&');
-        <% } else { %>
-            options.body = JSON.stringify(model);
         <% } %>
-    <% } %>
 
-    <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
-        url = url.replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
-    <% } %>
+        <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
+            url = url.replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
+        <% } %>
 
-    const response = await fetch(url, await this.transformOptions(options));
+        const response = await fetch(url, await this.transformOptions(options));
 
-    const status = response.status;
-    const headers: any = {};
+        const status = response.status;
+        const headers: any = {};
 
-    if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
+        if (response.headers && response.headers.forEach) { response.headers.forEach((v: any, k: any) => headers[k] = v); };
 
-    const responseText = await response.text();
+        const responseText = await response.text();
 
-    if (status === 200) {
-    if(handle[200]){
-    return await handle[200](responseText === "" ? null : JSON.parse(responseText));
-    }
-    return JSON.parse(responseText)
-    }
-    <%= func.errorCode.filter(a =>a!=='401').map(a => `else if (status === ${a}) {
+        if (status === 200) {
+        if(handle[200]){
+        return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+        }
+        return JSON.parse(responseText)
+        }
+        <%= func.errorCode.filter(a =>a!=='401').map(a => `else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('') %>
-    else if (status===401){
-    <%if(func.errorCode.find(a =>a==='401')){%>
-        if(!handle[401]){
-        this.options.handleUnauthorized(responseText);
-        }else{
-        await handle[401](responseText);
-        }
-    <%} else{ %>
-        this.options.handleUnauthorized(responseText);
-    <%} %>
+        else if (status===401){
+        <%if(func.errorCode.find(a =>a==='401')){%>
+            if(!handle[401]){
+            this.options.handleUnauthorized(responseText);
+            }else{
+            await handle[401](responseText);
+            }
+        <%} else{ %>
+            this.options.handleUnauthorized(responseText);
+        <%} %>
 
-    }
-    else {
-    if(!handle[500]){
-    this.options.handleError(responseText);
-    }else{
-    await handle[500](responseText);
-    }
-    }
-    }catch(ex){
-    if(!handle[500]){
-    this.options.handleError(ex.toString());
-    }else{
-    await handle[500](ex.toString());
-    }
-    }
-    }
+        }
+        else {
+        if(!handle[500]){
+        this.options.handleError(responseText);
+        }else{
+        await handle[500](responseText);
+        }
+        }
+        }catch(ex){
+        if(!handle[500]){
+        this.options.handleError(ex.toString());
+        }else{
+        await handle[500](ex.toString());
+        }
+        }
+        }
     <% } %>
 
     }
@@ -131,12 +131,13 @@ import {BaseClient,ControllerOptions} from './baseClient';
         <% for(const ev of controller.websocketEvents) { %>
             <%= ev.name.replace('send', 'on') %>?:(req:<%= ev.requestType %>)=>void;
         <% } %>
-        onDisconnect?:()=>void;onConnect?:()=>void;
+        onDisconnect?:()=>void;
+        onConnect?:()=>void;
         }
     <% } %>
 
-    <% } %>
+<% } %>
 
-    <% for(const interface of interfaces) { %>
-        <%= interface %>
-    <% } %>
+<% for(const interface of interfaces) { %>
+    <%= interface %>
+<% } %>
