@@ -5,13 +5,16 @@ paths:
   <%= func.url %>:
     <%= func.method.toLowerCase() %>:
       summary: '<%=func.description%>'
+<%if(func.auth){%>      security:
+        - ApiKeyAuth: []
+<%}%>
 <% if(func.method.toUpperCase() === 'GET') { %>
       parameters:<%for(const f of interfaces.find(a=>a.name===func.requestType).fields){%>
         - name: <%=f.name%>
           in: query
           required: true
           schema:
-            type: <%=f.type%><%}%>
+            <%=f.type%><%}%>
 <% } else { %>
       requestBody:
         required: true
@@ -36,11 +39,16 @@ paths:
 <% } %>
 
 components:
+  securitySchemes:
+    ApiKeyAuth:
+      type: apiKey
+      in: header
+      name: Authorization
   schemas:
 <% for(const interface of interfaces) { %>
     <%= interface.name %>:
       type: object
       properties:<%for(const f of interface.fields){%>
         <%=f.name%>:
-          type: <%=f.type%><%}%>
+          <%=f.type%><%}%>
 <% } %>

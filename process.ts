@@ -2,7 +2,7 @@ import {match} from '@phenomnomnominal/tsquery/dist/src/match';
 import * as ejs from 'ejs';
 import * as fs from 'fs';
 import * as prettier from 'prettier';
-import Project, {FileSystemHost, MethodDeclaration, SyntaxKind, ts} from 'ts-simple-ast';
+import Project, {FileSystemHost, MethodDeclaration, Symbol, SyntaxKind, ts} from 'ts-simple-ast';
 import {isKebabCased} from 'tslint/lib/utils';
 import {ManageSymbols} from './manageSymbols';
 import {buildValidatorMethod, validationMethods} from './validationTester';
@@ -272,7 +272,8 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
         errorTypes,
         `/${controllerDataItem.route || controllerDataItem.name}/${method.path}`,
         method.method,
-        method.options.find(a => a.key === 'description').value
+        method.options.find(a => a.key === 'description').value,
+        !!method.options.find(a => a.key === 'auth').value
       );
     }
     for (const websocket of controllerDataItem.websockets) {
@@ -352,29 +353,59 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
 
   if (openApi) {
     console.time('write openapi template');
-    const interfaces = symbolManager.symbolTypes.map(a => {
-      return {
-        name: a.getSymbol().getEscapedName(),
-        fields: a.getProperties().map(p => {
-          const typeV = p.getDeclarations()[0].getType();
-          let type: string;
-          switch (typeV.getText()) {
-            case 'string':
-            case 'number':
-            case 'boolean':
-              type = typeV.getText();
-              break;
-            default:
-              type = `
-          $ref: '#/components/schemas/${typeV.getSymbol().getEscapedName()}'`;
-          }
-          return {
-            name: p.getEscapedName(),
-            type,
-          };
-        }),
-      };
-    });
+    const interfaces = symbolManager.symbolTypes
+      .filter(a => !a.isUnion())
+      .map(a => {
+        return {
+          name: (a.getSymbol() || a.getAliasSymbol()).getEscapedName(),
+          fields: a.getProperties().map(topP => {
+            function getType(p: Symbol) {
+              const typeV = p.getDeclarations()[0].getType();
+              let type: string;
+              if (typeV.isUnion() && typeV.getText() !== 'boolean') {
+                type = `
+          enum:`;
+                for (const unionType of typeV.getUnionTypes()) {
+                  type += `
+            - ${unionType.getText()}`;
+                }
+              } else {
+                switch (typeV.getSymbol()?.getEscapedName() ?? typeV.getText()) {
+                  case 'string':
+                  case 'number':
+                  case 'boolean':
+                    type = 'type: ' + typeV.getText();
+                    break;
+                  case 'Array':
+                    if (typeV.getArrayType().getSymbol()) {
+                      type = `type: array
+          items:
+            $ref: '#/components/schemas/${typeV
+              .getArrayType()
+              .getSymbol()
+              .getEscapedName()}'`;
+                    } else {
+                      type = `type: array
+          items:
+            type: ${typeV.getArrayType().getText()}`;
+                    }
+
+                    break;
+                  default:
+                    type = `
+          $ref: '#/components/schemas/${(typeV.getSymbol() ?? typeV.getAliasSymbol()).getEscapedName()}'`;
+                }
+              }
+              return type;
+            }
+
+            return {
+              name: topP.getEscapedName(),
+              type: getType(topP),
+            };
+          }),
+        };
+      });
     const apiJs = ejs.render(
       fs.readFileSync(require.resolve('./openApiTemplate.ejs'), {encoding: 'utf8'}),
       {
@@ -390,7 +421,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
     console.timeEnd('write openapi template');
   }
 
-  if (!openApi && !noValidation) {
+  if (!noValidation) {
     console.time('validator');
     buildValidator(apiPath);
     console.timeEnd('validator');
@@ -440,6 +471,7 @@ ${validationMethods.join('\r\n')}
   const prettierFile = apiPath + '.prettierrc';
   const prettierOptions = readJson(prettierFile);
   if (prettierOptions) {
+    prettierOptions.parser = 'typescript';
     js = prettier.format(js, prettierOptions);
   }
 
@@ -458,6 +490,7 @@ const controllers: {
     urlReplaces: string[];
     handleType: string;
     description: string;
+    auth: boolean;
   }[];
   websocketFunctions: {
     route: string;
@@ -484,7 +517,8 @@ function addFunction(
   errorTypes: ts.Symbol[],
   url: string,
   method: string,
-  description: string
+  description: string,
+  auth: boolean
 ) {
   const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
   const handleType = `{200?:(result:${returnType})=>TPromise,500?:(result:string)=>void,${errorTypes
@@ -516,6 +550,7 @@ function addFunction(
     method,
     errorCode,
     description,
+    auth,
   });
 }
 function addWebsocketFunction(controllerName: string, name: string, requestType: string, route: string) {
