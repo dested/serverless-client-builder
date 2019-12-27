@@ -5,6 +5,8 @@
   "main": "index.js",
   "scripts": {
     "start": "node -r ts-node/register index --in c:\\code\\double-dates\\api\\ --out c:\\code\\double-dates\\app/src/dataServices/app.generated.ts --micro true",
+    "cl-test": "node -r ts-node/register index --in c:\\code\\cleverrx\\api\\ --out c:\\code\\cleverrx\\app/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\admin/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\web/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\partner-portal/src/dataServices/app.generated.ts --noYaml --noValidation --openApi=c:\\code\\cleverrx\\api\\openApi.yaml",
+    "cl-test-brk": "node --inspect-brk -r ts-node/register index.ts --in c:\\code\\cleverrx\\api\\ --out c:\\code\\cleverrx\\app/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\admin/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\web/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\partner-portal/src/dataServices/app.generated.ts --noYaml --noValidation --openApi=c:\\code\\cleverrx\\api\\openApi.yaml",
     "debug": "node --inspect-brk -r ts-node/register index.ts  --in c:\\code\\double-dates\\api\\ --out c:\\code\\double-dates\\admin/src/dataServices/app.generated.ts --micro true",
     "debug-validation": "node --inspect-brk -r ts-node/register validationTester.ts",
     "test": "node -r ts-node/register tester",

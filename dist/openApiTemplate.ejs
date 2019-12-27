@@ -1,0 +1,46 @@
+paths:
+<% for(const controller of controllers) { %>
+<% const name = controller.controllerName.replace(/(\-\w)/g, (m) => m[1].toUpperCase()).replace(/^\w/, c => c.toUpperCase()) %>
+<% for(const func of controller.functions) { %>
+  <%= func.url %>:
+    <%= func.method.toLowerCase() %>:
+      summary: '<%=func.description%>'
+<% if(func.method.toUpperCase() === 'GET') { %>
+      parameters:<%for(const f of interfaces.find(a=>a.name===func.requestType).fields){%>
+        - name: <%=f.name%>
+          in: query
+          required: true
+          schema:
+            type: <%=f.type%><%}%>
+<% } else { %>
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/<%=func.requestType%>'
+  <% } %>
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/<%=func.returnType%>'
+        '401':
+          description: Unauthorized
+<%= func.errorCode.filter(a =>a!=='401').map(a => `        '${a}':
+          description: Request Error
+`).join('') %>
+<% } %>
+<% } %>
+
+components:
+  schemas:
+<% for(const interface of interfaces) { %>
+    <%= interface.name %>:
+      type: object
+      properties:<%for(const f of interface.fields){%>
+        <%=f.name%>:
+          type: <%=f.type%><%}%>
+<% } %>
