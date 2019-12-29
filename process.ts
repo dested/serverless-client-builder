@@ -272,8 +272,8 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
         errorTypes,
         `/${controllerDataItem.route || controllerDataItem.name}/${method.path}`,
         method.method,
-        method.options.find(a => a.key === 'description').value,
-        !!method.options.find(a => a.key === 'auth').value
+        method.options.find(a => a.key === 'description')?.value,
+        !!method.options.find(a => a.key === 'auth')?.value
       );
     }
     for (const websocket of controllerDataItem.websockets) {
