@@ -93,11 +93,11 @@ declare type ObjectId = string;
         }
         return JSON.parse(responseText)
         }
-        <%= func.errorCode.filter(a =>a!=='401').map(a => `else if (status === ${a}) {
+        <%= func.errorTypes.filter(a =>a!==401).map(a => `else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('') %>
         else if (status===401){
-        <%if(func.errorCode.find(a =>a==='401')){%>
+        <%if(func.errorTypes.find(a =>a===401)){%>
             if(!handle[401]){
             this.options.handleUnauthorized(responseText);
             }else{
