@@ -213,7 +213,12 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
   ${controllerDataItem.name}_${websocket.name}:
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
-${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
+${websocket.routeKey
+  .map(
+    a => `      - websocket: 
+         route: ${a}`
+  )
+  .join('\r\n')}`;
       }
     }
     fs.writeFileSync(apiPath + 'serverless.yml', mainServerless, {encoding: 'utf8'});
