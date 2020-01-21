@@ -268,7 +268,7 @@ ${websocket.routeKey
       const funcName = websocket.name;
       const funcNode = websocket.declaration;
 
-      assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
+      assert(funcNode.getParameters().length === 1, `${funcName} The export must only have one parameter`);
       const eventArg = funcNode.getParameters()[0].getType();
       assert(
         eventArg.getSymbol().getName() === 'WebsocketRequestEvent',

@@ -27,7 +27,7 @@ declare type ObjectId = string;
         this.socket.onclose = e => {
         events.onDisconnect && events.onDisconnect();
         };
-        this.socket.onopen = e => {
+        this.socket.onopen = () => {
         events.onConnect && events.onConnect();
         };
         }
@@ -109,11 +109,21 @@ declare type ObjectId = string;
 
         }
         else {
-        if(!handle[500]){
-        this.options.handleError(responseText);
-        }else{
-        await handle[500](responseText);
+ try {
+          const body = JSON.parse(responseText);
+          if (!handle[500]) {
+            this.options.handleError(body.error || responseText);
+          } else {
+            await handle[500](body.error || responseText);
+          }
+        } catch (ex) {
+          if (!handle[500]) {
+            this.options.handleError(responseText);
+          } else {
+            await handle[500](responseText);
+          }
         }
+
         }
         }catch(ex){
         if(!handle[500]){
