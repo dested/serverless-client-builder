@@ -75,7 +75,8 @@ declare type ObjectId = string;
         <% } %>
 
         <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
-            url = url.replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
+            url = url.replace(':<%= func.urlReplaces[u] %>',model.<%= func.urlReplaces[u] %>)
+            .replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
         <% } %>
 
         const response = await fetch(url, await this.transformOptions(options));

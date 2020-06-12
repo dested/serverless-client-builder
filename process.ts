@@ -77,7 +77,7 @@ export function processFile(
                 options.push({key, value: requestOptions[key]});
               }
               controllerData.methods.push({
-                controllerName: controllerData.name,
+                controllerName: classDeclaration.getName().replace('Controller', ''),
                 name,
                 method,
                 path,
@@ -499,7 +499,7 @@ function addFunction(
   description: string,
   auth: boolean
 ) {
-  errorTypes.push(401);
+  if (!errorTypes.find(a => a === 401)) errorTypes.push(401);
   const handleType = `{200?:(result:${returnType})=>TPromise,500?:(result:string)=>void,${errorTypes
     .map(a => {
       const statusCode = a;
@@ -517,7 +517,7 @@ function addFunction(
     controllers.push(controller);
   }
 
-  const urlReplaces = matchAll(/{(\w+)}/g, url);
+  const urlReplaces = [...matchAll(/:(\w+)/g, url), ...matchAll(/{(\w+)}/g, url)];
   controller.functions.push({
     name,
     handleType,
