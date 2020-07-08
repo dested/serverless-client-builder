@@ -27,7 +27,7 @@ declare type ObjectId = string;
         this.socket.onclose = e => {
         events.onDisconnect && events.onDisconnect();
         };
-        this.socket.onopen = e => {
+        this.socket.onopen = () => {
         events.onConnect && events.onConnect();
         };
         }
@@ -75,7 +75,8 @@ declare type ObjectId = string;
         <% } %>
 
         <% for(let u = 0;u < func.urlReplaces.length;u++) { %>
-            url = url.replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
+            url = url.replace(':<%= func.urlReplaces[u] %>',model.<%= func.urlReplaces[u] %>)
+            .replace('{<%= func.urlReplaces[u] %>}',model.<%= func.urlReplaces[u] %>);
         <% } %>
 
         const response = await fetch(url, await this.transformOptions(options));
@@ -93,11 +94,11 @@ declare type ObjectId = string;
         }
         return JSON.parse(responseText)
         }
-        <%= func.errorCode.filter(a =>a!=='401').map(a => `else if (status === ${a}) {
+        <%= func.errorTypes.filter(a =>a!==401).map(a => `else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('') %>
         else if (status===401){
-        <%if(func.errorCode.find(a =>a==='401')){%>
+        <%if(func.errorTypes.find(a =>a===401)){%>
             if(!handle[401]){
             this.options.handleUnauthorized(responseText);
             }else{
@@ -109,11 +110,21 @@ declare type ObjectId = string;
 
         }
         else {
-        if(!handle[500]){
-        this.options.handleError(responseText);
-        }else{
-        await handle[500](responseText);
+ try {
+          const body = JSON.parse(responseText);
+          if (!handle[500]) {
+            this.options.handleError(body.error || responseText);
+          } else {
+            await handle[500](body.error || responseText);
+          }
+        } catch (ex) {
+          if (!handle[500]) {
+            this.options.handleError(responseText);
+          } else {
+            await handle[500](responseText);
+          }
         }
+
         }
         }catch(ex){
         if(!handle[500]){

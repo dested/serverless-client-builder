@@ -67,18 +67,17 @@ export function processFile(
               const name = declaration.getName();
               const method = eval(decorator.getArguments()[0].getText());
               const path = eval(decorator.getArguments()[1].getText());
-              const options: {key: string; value: string}[] = [];
-              if (decorator.getArguments()[2]) {
-                const text = decorator.getArguments()[2].getText();
-                const requestOptions = eval('(' + text + ')');
-                if (requestOptions) {
-                  for (const key of Object.keys(requestOptions)) {
-                    options.push({key, value: requestOptions[key]});
-                  }
-                }
+              const options: {key: string; value: any}[] = [];
+              assert(!!decorator.getArguments()[2], `Missing options arg ${name}`);
+              const text = decorator.getArguments()[2].getText();
+              const requestOptions = eval('(' + text + ')');
+              assert(!!requestOptions, `Missing options arg ${name}`);
+              assert(Array.isArray(requestOptions.statusCodes), `Missing status code arg ${name}`);
+              for (const key of Object.keys(requestOptions)) {
+                options.push({key, value: requestOptions[key]});
               }
               controllerData.methods.push({
-                controllerName: controllerData.name,
+                controllerName: classDeclaration.getName().replace('Controller', ''),
                 name,
                 method,
                 path,
@@ -91,7 +90,7 @@ export function processFile(
               const rate: string = eval(decorator.getArguments()[0].getText());
 
               const data = controllerData.events.find(a => a.name === methodName);
-              const options: {key: string; value: string}[] = [];
+              const options: {key: string; value: any}[] = [];
               if (decorator.getArguments()[1]) {
                 const text = decorator.getArguments()[1].getText();
                 const requestOptions = eval('(' + text + ')');
@@ -214,7 +213,12 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
   ${controllerDataItem.name}_${websocket.name}:
     handler: handler.${controllerDataItem.name}_${websocket.name}
     events:
-${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
+${websocket.routeKey
+  .map(
+    a => `      - websocket: 
+         route: ${a}`
+  )
+  .join('\r\n')}`;
       }
     }
     fs.writeFileSync(apiPath + 'serverless.yml', mainServerless, {encoding: 'utf8'});
@@ -229,13 +233,9 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
 
       const funcNode = method.declaration;
 
-      assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
+      assert(funcNode.getParameters().length >= 1, 'The export must have a request model parameter');
       const eventArg = funcNode.getParameters()[0].getType();
-      assert(
-        eventArg.getSymbol().getName() === 'RequestEvent' || eventArg.getSymbol().getName() === 'GetRequestEvent',
-        'RequestEvent argument must be a generic event class'
-      );
-      const typeArgument = eventArg.getTypeArguments()[0];
+      const typeArgument = eventArg;
       let requestName: string;
 
       symbolManager.addSymbol(typeArgument, true);
@@ -245,31 +245,15 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
       const returnType = funcNode.getReturnType();
       assert(returnType.getSymbol().getName() === 'Promise', 'Return type must must be a promise');
       const returnTypeArgument = returnType.getTypeArguments()[0];
-      assert(
-        returnTypeArgument.getSymbol().getName() === 'HttpResponse',
-        'Return type must must be a promise of HttpResponse'
-      );
-      const httpResponseTypeArgument = returnTypeArgument.getTypeArguments()[0];
-      const httpResponseErrorArgument = returnTypeArgument.getTypeArguments()[1];
+      const httpResponseTypeArgument = returnTypeArgument;
 
-      const errorTypes: ts.Symbol[] = [];
-
-      if ((httpResponseErrorArgument.compilerType as any).intrinsicName !== 'undefined') {
-        if (httpResponseErrorArgument.getUnionTypes().length === 0) {
-          errorTypes.push(httpResponseErrorArgument.getApparentType().compilerType.getSymbol());
-        } else {
-          for (const unionType of httpResponseErrorArgument.getUnionTypes()) {
-            errorTypes.push(unionType.compilerType.getSymbol());
-          }
-        }
-      }
       symbolManager.addSymbol(httpResponseTypeArgument, true);
       addFunction(
         method.controllerName,
         funcName,
         requestName,
         httpResponseTypeArgument.getSymbol().getName(),
-        errorTypes,
+        method.options.find(a => a.key === 'statusCodes').value,
         `/${controllerDataItem.route || controllerDataItem.name}/${method.path}`,
         method.method,
         method.options.find(a => a.key === 'description')?.value,
@@ -284,7 +268,7 @@ ${websocket.routeKey.map(a => `      - websocket: ${a}`).join('\r\n')}`;
       const funcName = websocket.name;
       const funcNode = websocket.declaration;
 
-      assert(funcNode.getParameters().length === 1, 'The export must only have one parameter');
+      assert(funcNode.getParameters().length === 1, `${funcName} The export must only have one parameter`);
       const eventArg = funcNode.getParameters()[0].getType();
       assert(
         eventArg.getSymbol().getName() === 'WebsocketRequestEvent',
@@ -486,7 +470,7 @@ const controllers: {
     name: string;
     requestType: string;
     returnType: string;
-    errorCode: string[];
+    errorTypes: number[];
     urlReplaces: string[];
     handleType: string;
     description: string;
@@ -504,31 +488,25 @@ const controllers: {
   }[];
 }[] = [];
 
-function getSourceWithoutStatusCode(a: ts.Symbol) {
-  const source = getSource(a, false);
-  return source.replace(/statusCode\s*:\s*\d+,?;?/g, '');
-}
-
 function addFunction(
   controllerName: string,
   name: string,
   requestType: string,
   returnType: string,
-  errorTypes: ts.Symbol[],
+  errorTypes: number[],
   url: string,
   method: string,
   description: string,
   auth: boolean
 ) {
-  const errorCode = errorTypes.map(a => (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text);
+  if (!errorTypes.find(a => a === 401)) errorTypes.push(401);
   const handleType = `{200?:(result:${returnType})=>TPromise,500?:(result:string)=>void,${errorTypes
     .map(a => {
-      const statusCode = (a.members.get('statusCode' as any).valueDeclaration as any).type.literal.text;
-      const source = getSourceWithoutStatusCode(a);
-      if (statusCode === '401') {
+      const statusCode = a;
+      if (statusCode === 401) {
         return `${statusCode}?:(error:string)=>void`;
       } else {
-        return `${statusCode}:(result:${source})=>void`;
+        return `${statusCode}:(result:{error:string})=>void`;
       }
     })
     .join(',')}}`;
@@ -539,7 +517,7 @@ function addFunction(
     controllers.push(controller);
   }
 
-  const urlReplaces = matchAll(/{(\w+)}/g, url);
+  const urlReplaces = [...matchAll(/:(\w+)/g, url), ...matchAll(/{(\w+)}/g, url)];
   controller.functions.push({
     name,
     handleType,
@@ -548,7 +526,7 @@ function addFunction(
     url,
     urlReplaces,
     method,
-    errorCode,
+    errorTypes,
     description,
     auth,
   });
@@ -616,7 +594,7 @@ export interface ControllerData {
   methods: ControllerMethodData[];
   events: ControllerEventData[];
   websockets: ControllerWebsocketData[];
-  options: {key: string; value: string}[];
+  options: {key: string; value: any}[];
   websocketEvents: ControllerWebsocketEventData[];
 }
 export interface ControllerMethodData {
@@ -625,13 +603,13 @@ export interface ControllerMethodData {
   method: string;
   path: string;
   declaration: MethodDeclaration;
-  options: {key: string; value: string}[];
+  options: {key: string; value: any}[];
 }
 export interface ControllerEventData {
   controllerName: string;
   name: string;
   rate: string[];
-  options: {key: string; value: string}[];
+  options: {key: string; value: any}[];
   declaration: MethodDeclaration;
 }
 

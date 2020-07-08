@@ -1,5 +1,5 @@
 {
-  "name": "sls-client",
+  "name": "sls-client-2",
   "version": "1.0.0",
   "description": "",
   "main": "index.js",
@@ -15,7 +15,7 @@
   },
   "preferGlobal": true,
   "bin": {
-    "sls-client": "./dist/index.js"
+    "sls-client-2": "./dist/index.js"
   },
   "devDependencies": {
     "@phenomnomnominal/tsquery": "^2.1.1",
