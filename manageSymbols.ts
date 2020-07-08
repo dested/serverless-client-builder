@@ -1,4 +1,5 @@
-import {ts, Type} from 'ts-simple-ast';
+import {IndexSignatureDeclaration, ts, Type, TypeNode, TypeParameterDeclaration} from 'ts-simple-ast';
+import MappedTypeNode = ts.MappedTypeNode;
 
 export class ManageSymbols {
   symbols: ts.Symbol[] = [];
@@ -19,7 +20,7 @@ export class ManageSymbols {
       this.addSymbol(t, false);
     }
 
-    const symbol = type.getSymbol() || type.getAliasSymbol();
+    const symbol = type.getAliasSymbol() ?? type.getSymbol();
     if (!symbol) {
       // console.log(type.getText());
       return;
@@ -61,7 +62,15 @@ export class ManageSymbols {
       }
     }
 
-    for (const member of symbol.getMembers()) {
+    const members = [
+      ...symbol.getMembers(),
+      ...(symbol
+        .getDeclaredType()
+        ?.getSymbol()
+        ?.getMembers() ?? []),
+    ].filter(a => a);
+
+    for (const member of members) {
       // console.log(symbol.getName() + ' ' + member.getName());
       const memberType = member.getDeclarations()[0].getType();
       if (memberType.isArray()) {
@@ -82,6 +91,68 @@ export class ManageSymbols {
             break;
         }
       } else {
+        if (member.getName() === 'subscriber_badges') {
+          debugger;
+          console.log(memberType.getSymbol().getMembers());
+        }
+        if (
+          (memberType
+            .getSymbol()
+            ?.getMembers()[0]
+            ?.getDeclarations()[0]
+            ?.getSymbol()
+            ?.getDeclarations()[0] as any)?.getKeyType
+        ) {
+          const keyType = (memberType
+            .getSymbol()
+            .getMembers()[0]
+            .getDeclarations()[0]
+            .getSymbol()
+            .getDeclarations()[0] as any).getKeyType() as Type;
+          const returnType = (memberType
+            .getSymbol()
+            .getMembers()[0]
+            .getDeclarations()[0]
+            .getSymbol()
+            .getDeclarations()[0] as any).getReturnType() as Type;
+          this.addSymbol(keyType, false);
+          this.addSymbol(returnType, false);
+        }
+        if (
+          memberType
+            .getSymbol()
+            ?.getDeclarations()[0]
+            ?.getKind() === 179
+        ) {
+          const keyType = (memberType
+            .getSymbol()
+            .getDeclarations()[0]
+            .getType().compilerType as any).constraintType.aliasSymbol.escapedName;
+          const returnType = (memberType.getSymbol().getDeclarations()[0].compilerNode as any).type.typeName
+            ?.escapedText;
+
+          this.addSymbol(
+            memberType
+              .getSymbol()
+              .getDeclarations()[0]
+              .getSourceFile()
+              .getTypeAlias(keyType)
+              .getType(),
+            false
+          );
+          if (returnType) {
+            this.addSymbol(
+              memberType
+                .getSymbol()
+                .getDeclarations()[0]
+                .getSourceFile()
+                .getTypeAlias(returnType)
+                .getType(),
+              false
+            );
+          }
+        }
+
         switch (memberType.getSymbol() && memberType.getSymbol().getEscapedName()) {
           case 'any':
           case 'string':
