@@ -286,21 +286,23 @@ ${websocket.routeKey
       const funcName = websocketEvent.name;
       const funcNode = websocketEvent.declaration;
 
-      assert(
-        funcNode.getParameters().length === 3,
-        `The export must only have three parameters: ${websocketEvent.name} ${funcNode.getParameters().length}`
-      );
-      const eventArg = funcNode.getParameters()[2].getType();
-      assert(
-        eventArg.getSymbol().getName() === 'WebSocketResponse',
-        'WebSocketEvent argument must be a generic event class'
-      );
-      const typeArgument = eventArg.getTypeArguments()[0];
-      let requestName: string;
-      symbolManager.addSymbol(typeArgument, true);
-      requestName = typeArgument.getSymbol().getName();
+      let found = false;
+      for (const parameter of funcNode.getParameters()) {
+        const eventArg = parameter.getType();
+        if (eventArg.getSymbol().getName() === 'WebSocketResponse') {
+          const typeArgument = eventArg.getTypeArguments()[0];
+          let requestName: string;
+          symbolManager.addSymbol(typeArgument, true);
+          requestName = typeArgument.getSymbol().getName();
+          addWebsocketEvent(websocketEvent.controllerName, funcName, requestName, websocketEvent.routeKey);
+          found = true;
+          break;
+        }
+      }
 
-      addWebsocketEvent(websocketEvent.controllerName, funcName, requestName, websocketEvent.routeKey);
+      if (!found) {
+        assert(false, 'WebSocketEvent argument must be a generic event class');
+      }
     }
   }
   console.profileEnd();

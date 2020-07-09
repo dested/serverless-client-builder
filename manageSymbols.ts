@@ -91,10 +91,6 @@ export class ManageSymbols {
             break;
         }
       } else {
-        if (member.getName() === 'subscriber_badges') {
-          debugger;
-          console.log(memberType.getSymbol().getMembers());
-        }
         if (
           (memberType
             .getSymbol()
