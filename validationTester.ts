@@ -32,7 +32,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           optional = true;
         }
 
-        let variable = `model.${fieldName}`;
+        let variable = `model['${fieldName}']`;
 
         let isArray = false;
         if (type.isArray()) {
@@ -46,7 +46,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
         } else {
           results.push(`if ('${fieldName}' in model) {`);
           results.push(`fieldCount++;`);
-          results.push(`if (model.${fieldName}!==null && model.${fieldName}!==undefined) {`);
+          results.push(`if (model['${fieldName}']!==null && model['${fieldName}']!==undefined) {`);
         }
 
         if (isArray) {
@@ -119,7 +119,9 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
                       ) {
                         unionConditional.push(`${variable}!==${unionTypeText}`);
                       } else {
-                        unionConditional.push(`this.validate${unionTypeText}(${variable})`);
+                        if (unionTypeText !== 'undefined' && unionTypeText !== undefined) {
+                          unionConditional.push(`this.validate${unionTypeText}(${variable})`);
+                        }
                       }
                       break;
                   }
