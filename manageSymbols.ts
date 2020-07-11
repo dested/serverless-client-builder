@@ -10,6 +10,12 @@ export class ManageSymbols {
     if ((type.compilerType as any).intrinsicName === 'void') {
       return;
     }
+    const symbol = type.getAliasSymbol() ?? type.getSymbol();
+
+    const simpleText = type.getText();
+    if (simpleText === 'Date') {
+      return;
+    }
     for (const t of type.getIntersectionTypes()) {
       this.addSymbol(t, false);
     }
@@ -20,7 +26,6 @@ export class ManageSymbols {
       this.addSymbol(t, false);
     }
 
-    const symbol = type.getAliasSymbol() ?? type.getSymbol();
     if (!symbol) {
       // console.log(type.getText());
       return;

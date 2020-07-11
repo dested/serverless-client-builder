@@ -5,6 +5,8 @@ export const validationMethods: string[] = [];
 const methodNames: string[] = [];
 
 export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type<ts.Type>) {
+  if (name === 'GameConfigurationEmotes') debugger;
+
   if (methodNames.find(a => a === name)) {
     return;
   }
@@ -25,6 +27,9 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
         const fieldName = property.getName();
         // console.log(name, fieldName);
         let type = property.getDeclarations()[0].getType();
+        if (type.isUnion() && type.getUnionTypes().length === 2 && type.getUnionTypes()[0].isUndefined()) {
+          type = type.getUnionTypes()[1];
+        }
         let typeText = type.getText(null, 1);
         const results: string[] = [];
         let optional = false;
