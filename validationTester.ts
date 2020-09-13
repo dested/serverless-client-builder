@@ -5,7 +5,13 @@ export const validationMethods: string[] = [];
 const methodNames: string[] = [];
 
 export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type<ts.Type>) {
-  if (name === 'GameConfigurationEmotes') debugger;
+  if (name === 'ObjectId' || name === 'ObjectID') {
+    validationMethods.push(`static validate${name}(model: any):boolean {
+    if(typeof model==='string')return true;
+    return false;
+    }`);
+    return;
+  }
 
   if (methodNames.find(a => a === name)) {
     return;
@@ -33,7 +39,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
         let typeText = type.getText(null, 1);
         const results: string[] = [];
         let optional = false;
-        if (property.getValueDeclaration() && (property.getValueDeclaration() as any).getQuestionTokenNode()) {
+        if (property.getValueDeclaration() && (property.getValueDeclaration() as any).getQuestionTokenNode?.()) {
           optional = true;
         }
 

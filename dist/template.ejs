@@ -90,7 +90,9 @@ declare type ObjectId = string;
 
         if (status === 200) {
         if(handle[200]){
-        return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+            const val=responseText === "" ? null : JSON.parse(responseText);
+         await handle[200](val);
+            return val;
         }
         return JSON.parse(responseText)
         }

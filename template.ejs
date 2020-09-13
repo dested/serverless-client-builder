@@ -90,7 +90,9 @@ declare type ObjectId = string;
 
         if (status === 200) {
         if(handle[200]){
-        return await handle[200](responseText === "" ? null : JSON.parse(responseText));
+        const val=responseText === "" ? null : JSON.parse(responseText);
+        await handle[200](val);
+        return val;
         }
         return JSON.parse(responseText)
         }
@@ -110,19 +112,19 @@ declare type ObjectId = string;
 
         }
         else {
- try {
-          const body = JSON.parse(responseText);
-          if (!handle[500]) {
-            this.options.handleError(body.error || responseText);
-          } else {
-            await handle[500](body.error || responseText);
-          }
+        try {
+        const body = JSON.parse(responseText);
+        if (!handle[500]) {
+        this.options.handleError(body.error || responseText);
+        } else {
+        await handle[500](body.error || responseText);
+        }
         } catch (ex) {
-          if (!handle[500]) {
-            this.options.handleError(responseText);
-          } else {
-            await handle[500](responseText);
-          }
+        if (!handle[500]) {
+        this.options.handleError(responseText);
+        } else {
+        await handle[500](responseText);
+        }
         }
 
         }

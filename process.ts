@@ -1,3 +1,4 @@
+//https://github.com/YousefED/typescript-json-schema
 import {match} from '@phenomnomnominal/tsquery/dist/src/match';
 import * as ejs from 'ejs';
 import * as fs from 'fs';
@@ -14,8 +15,11 @@ export function processFile(
   outputFiles: string[],
   noValidation: boolean,
   noYaml: boolean,
+  templateV2: boolean,
   openApi: string
 ) {
+  const templateVersion = templateV2 ? './templateV2.ejs' : './template.ejs';
+
   console.time('parse');
   const tsConfigFilePath = apiPath + 'tsconfig.json';
 
@@ -312,7 +316,7 @@ ${websocket.routeKey
     console.time('write template');
 
     let js = ejs.render(
-      fs.readFileSync(require.resolve('./template.ejs'), {encoding: 'utf8'}),
+      fs.readFileSync(require.resolve(templateVersion), {encoding: 'utf8'}),
       {
         interfaces: symbolManager.symbols.map(a => getSource(a)),
         controllers,
@@ -502,7 +506,7 @@ function addFunction(
   auth: boolean
 ) {
   if (!errorTypes.find(a => a === 401)) errorTypes.push(401);
-  const handleType = `{200?:(result:${returnType})=>TPromise,500?:(result:string)=>void,${errorTypes
+  const handleType = `{200?:(result:${returnType})=>void,500?:(result:string)=>void,${errorTypes
     .map(a => {
       const statusCode = a;
       if (statusCode === 401) {
