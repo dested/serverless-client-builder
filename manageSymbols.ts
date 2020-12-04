@@ -10,8 +10,18 @@ export class ManageSymbols {
     if ((type.compilerType as any).intrinsicName === 'void') {
       return;
     }
-    const symbol = type.getAliasSymbol() ?? type.getSymbol();
+    if (type.isArray()) {
+      const typeArgument = type.getTypeArguments()[0];
+      this.addSymbol(typeArgument, topLevel);
+      return;
+    }
 
+    const symbol = type.getAliasSymbol() ?? type.getSymbol();
+    if (type.getTypeArguments().length > 0) {
+      for (const typeArgument of type.getTypeArguments()) {
+        this.addSymbol(typeArgument, true);
+      }
+    }
     const simpleText = type.getText();
     if (simpleText === 'Date') {
       return;
@@ -31,6 +41,9 @@ export class ManageSymbols {
       return;
     }
     if (symbol.getName() === 'ObjectID' || symbol.getName() === 'ObjectId') {
+      return;
+    }
+    if (symbol.getName() === 'T') {
       return;
     }
 

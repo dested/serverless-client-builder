@@ -230,7 +230,6 @@ ${websocket.routeKey
   }
 
   console.time('parse controllers');
-  console.profile('controllers');
   for (const controllerDataItem of controllerDataItems) {
     for (const method of controllerDataItem.methods) {
       const funcName = method.name;
@@ -309,7 +308,6 @@ ${websocket.routeKey
       }
     }
   }
-  console.profileEnd();
 
   console.timeEnd('parse controllers');
   if (!openApi) {
