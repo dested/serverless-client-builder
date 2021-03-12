@@ -13,5 +13,6 @@ processFile(
   !!yargs.argv.noValidation,
   !!yargs.argv.noYaml,
   !!yargs.argv.templateV2,
+  !!yargs.argv.templateV3,
   yargs.argv.openApi as string
 );

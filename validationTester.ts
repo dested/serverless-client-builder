@@ -74,7 +74,14 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           results.push(`this.validate${fieldName}(${variable});`);
         } else {
           const unionTypes = type.getUnionTypes();
-          if (!type.isBoolean() && unionTypes.length > 0) {
+          if (
+            unionTypes.length === 3 &&
+            unionTypes.every(a => a.getText() === 'true' || a.getText() === 'false' || a.getText() === 'undefined')
+          ) {
+            results.push(
+              `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
+            );
+          } else if (!type.isBoolean() && unionTypes.length > 0) {
             if (unionTypes.find(b => b.isEnumLiteral())) {
               const unionConditional: string[] = [];
               for (const unionType of unionTypes) {
@@ -113,6 +120,12 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
                   switch (unionTypeText) {
                     case 'string':
                       unionConditional.push(`typeof ${variable} !== 'string'`);
+                      break;
+                    case 'string[]':
+                      unionConditional.push(`(typeof ${variable} !== 'object' && typeof ${variable}[0] !== 'string')`);
+                      break;
+                    case 'number[]':
+                      unionConditional.push(`(typeof ${variable} !== 'object' && typeof ${variable}[0] !== 'number')`);
                       break;
                     case 'number':
                       unionConditional.push(`typeof ${variable} !== 'number'`);
@@ -168,6 +181,8 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
                 case 'Date':
                   console.log('date isnt super supported');
                   break;
+                case 'unknown':
+                  break;
                 case 'any':
                   /*
                           results.push(
@@ -205,6 +220,8 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
                 break;
               case 'Date':
                 console.log('date isnt super supported');
+                break;
+              case 'unknown':
                 break;
               case 'any':
                 /*

@@ -16,9 +16,10 @@ export function processFile(
   noValidation: boolean,
   noYaml: boolean,
   templateV2: boolean,
+  templateV3: boolean,
   openApi: string
 ) {
-  const templateVersion = templateV2 ? './templateV2.ejs' : './template.ejs';
+  const templateVersion = templateV2 ? './templateV2.ejs' : templateV3 ? './templateV3.ejs' : './template.ejs';
 
   console.time('parse');
   const tsConfigFilePath = apiPath + 'tsconfig.json';
