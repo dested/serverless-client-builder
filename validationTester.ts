@@ -1,10 +1,10 @@
-import Project, {SourceFile, ts, Type} from 'ts-simple-ast';
+import {Type} from 'ts-morph';
 
 export const validationMethods: string[] = [];
 
 const methodNames: string[] = [];
 
-export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type<ts.Type>) {
+export function buildValidatorMethod(apiFullPath: string, name: string, fullType: string, symbol: Type) {
   if (name === 'ObjectId' || name === 'ObjectID') {
     validationMethods.push(`static validate${name}(model: any):boolean {
     if(typeof model==='string')return true;
@@ -13,7 +13,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
     return;
   }
 
-  if (methodNames.find(a => a === name)) {
+  if (methodNames.find((a) => a === name)) {
     return;
   }
   methodNames.push(name);
@@ -29,7 +29,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
     
     ${symbol
       .getProperties()
-      .map(property => {
+      .map((property) => {
         const fieldName = property.getName();
         // console.log(name, fieldName);
         let type = property.getDeclarations()[0].getType();
@@ -48,7 +48,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
         let isArray = false;
         if (type.isArray()) {
           isArray = true;
-          typeText = type.getArrayType().getText(null, 1);
+          typeText = type.getArrayElementType().getText(null, 1);
         }
 
         if (!optional) {
@@ -66,7 +66,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           );
           results.push(`for (let i = 0; i < ${variable}.length; i++) { const ${fieldName}Elem = ${variable}[i];`);
           variable = `${fieldName}Elem`;
-          type = type.getArrayType();
+          type = type.getArrayElementType();
         }
 
         if (typeText.startsWith('{') && typeText.endsWith('}')) {
@@ -76,13 +76,13 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
           const unionTypes = type.getUnionTypes();
           if (
             unionTypes.length === 3 &&
-            unionTypes.every(a => a.getText() === 'true' || a.getText() === 'false' || a.getText() === 'undefined')
+            unionTypes.every((a) => a.getText() === 'true' || a.getText() === 'false' || a.getText() === 'undefined')
           ) {
             results.push(
               `if (typeof ${variable} !== 'boolean') throw new ValidationError('${name}', 'mismatch', '${fieldName}');`
             );
           } else if (!type.isBoolean() && unionTypes.length > 0) {
-            if (unionTypes.find(b => b.isEnumLiteral())) {
+            if (unionTypes.find((b) => b.isEnumLiteral())) {
               const unionConditional: string[] = [];
               for (const unionType of unionTypes) {
                 unionConditional.push(`${variable} !== '${(unionType.compilerType as any).value}'`);
@@ -93,7 +93,7 @@ export function buildValidatorMethod(apiFullPath: string, name: string, fullType
             } else {
               const unionConditional: string[] = [];
 
-              if (unionTypes.every(a => a.getSymbol() && a.getSymbol().getEscapedName() === '__type')) {
+              if (unionTypes.every((a) => a.getSymbol() && a.getSymbol().getEscapedName() === '__type')) {
                 const keyValues = findCommonUnionKey(unionTypes);
 
                 for (const keyValue of keyValues) {
@@ -268,7 +268,7 @@ function findCommonUnionKey(unionTypes: Type[]) {
   const firstUnionType = unionTypes[0];
   let key: string;
   for (const property of firstUnionType.getProperties()) {
-    if (unionTypes.every(a => !!a.getProperty(property.getName()))) {
+    if (unionTypes.every((a) => !!a.getProperty(property.getName()))) {
       key = property.getName();
       break;
     }
@@ -280,11 +280,7 @@ function findCommonUnionKey(unionTypes: Type[]) {
   for (const unionType of unionTypes) {
     items.push({
       key,
-      value: unionType
-        .getProperty(key)
-        .getValueDeclaration()
-        .getType()
-        .getText(),
+      value: unionType.getProperty(key).getValueDeclaration().getType().getText(),
       type: unionType,
     });
   }

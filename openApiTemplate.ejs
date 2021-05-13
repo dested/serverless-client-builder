@@ -32,7 +32,7 @@ paths:
                 $ref: '#/components/schemas/<%=func.returnType%>'
         '401':
           description: Unauthorized
-<%= func.errorCode.filter(a =>a!=='401').map(a => `        '${a}':
+<%= func.errorCode?.filter(a =>a!=='401').map(a => `        '${a}':
           description: Request Error
 `).join('') %>
 <% } %>

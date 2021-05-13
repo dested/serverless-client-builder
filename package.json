@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node -r ts-node/register index --in c:\\code\\double-dates\\api\\ --out c:\\code\\double-dates\\app/src/dataServices/app.generated.ts --micro true",
     "cl-test": "node -r ts-node/register index --in c:\\code\\cleverrx\\api\\ --out c:\\code\\cleverrx\\app/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\admin/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\web/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\partner-portal/src/dataServices/app.generated.ts --noYaml --openApi=c:\\code\\cleverrx\\api\\openApi.yaml",
-    "cl-test-brk": "node --inspect-brk -r ts-node/register index.ts --in c:\\code\\cleverrx\\api\\ --out c:\\code\\cleverrx\\app/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\admin/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\web/src/dataServices/app.generated.ts,c:\\code\\cleverrx\\partner-portal/src/dataServices/app.generated.ts --noYaml --openApi=c:\\code\\cleverrx\\api\\openApi.yaml",
+    "cl-test-brk": "node --inspect-brk -r ts-node/register index.ts --in c:\\code\\cleverrx\\clh-api\\ --out c:\\code\\cleverrx\\clh-app/src/dataServices/app.generated.ts --noYaml ",
     "debug": "node --inspect-brk -r ts-node/register index.ts  --in c:\\code\\clhealth\\api\\ --out c:\\code\\clhealth\\app/src/dataServices/app.generated.ts --noYaml --micro true",
     "debug-validation": "node --inspect-brk -r ts-node/register validationTester.ts",
     "test": "node -r ts-node/register tester",
@@ -24,20 +24,20 @@
     "@types/prettier": "^1.13.2",
     "@types/yamljs": "^0.2.30",
     "@types/yargs": "^12.0.1",
-    "prettier": "^1.19.1",
-    "ts-node": "^8.5.4",
-    "tslint": "^5.20.1",
+    "prettier": "^2.3.0",
+    "ts-node": "^9.1.1",
+    "tslint": "^6.1.3",
     "tslint-config-prettier": "^1.18.0",
     "tslint-eslint-rules": "^5.4.0",
-    "tslint-plugin-prettier": "^2.1.0",
-    "typescript": "^3.7.4"
+    "tslint-plugin-prettier": "^2.3.0",
+    "typescript": "^4.2.4"
   },
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "ejs": "^2.6.1",
-    "ts-simple-ast": "^15.0.0",
+    "ejs": "^3.1.6",
+    "ts-morph": "^10.0.2",
     "yamljs": "^0.3.0",
-    "yargs": "^12.0.5"
+    "yargs": "^17.0.1"
   }
 }

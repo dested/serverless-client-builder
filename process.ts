@@ -1,12 +1,11 @@
-//https://github.com/YousefED/typescript-json-schema
-import {match} from '@phenomnomnominal/tsquery/dist/src/match';
+// https://github.com/YousefED/typescript-json-schema
 import * as ejs from 'ejs';
 import * as fs from 'fs';
 import * as prettier from 'prettier';
-import Project, {FileSystemHost, MethodDeclaration, Symbol, SyntaxKind, ts} from 'ts-simple-ast';
-import {isKebabCased} from 'tslint/lib/utils';
+import {MethodDeclaration, Project, Symbol, SyntaxKind, Type, TypeFormatFlags} from 'ts-morph';
 import {ManageSymbols} from './manageSymbols';
 import {buildValidatorMethod, validationMethods} from './validationTester';
+import {Utils} from './utils';
 
 const requestSymbolManager = new ManageSymbols();
 
@@ -94,7 +93,7 @@ export function processFile(
               const methodName = declaration.getName();
               const rate: string = eval(decorator.getArguments()[0].getText());
 
-              const data = controllerData.events.find(a => a.name === methodName);
+              const data = controllerData.events.find((a) => a.name === methodName);
               const options: {key: string; value: any}[] = [];
               if (decorator.getArguments()[1]) {
                 const text = decorator.getArguments()[1].getText();
@@ -120,7 +119,7 @@ export function processFile(
             if (decorator.getName() === 'websocketRequest') {
               const methodName = declaration.getName();
               const routeKey: string = eval(decorator.getArguments()[0].getText());
-              const data = controllerData.websockets.find(a => a.name === methodName);
+              const data = controllerData.websockets.find((a) => a.name === methodName);
               if (data) {
                 data.routeKey.push(routeKey);
               } else {
@@ -182,10 +181,10 @@ export function processFile(
 `;
 
     for (const controllerDataItem of controllerDataItems) {
-      for (const method of controllerDataItem.methods.filter(a => a.options.find(b => b.key === 'bespoke'))) {
+      for (const method of controllerDataItem.methods.filter((a) => a.options.find((b) => b.key === 'bespoke'))) {
         const options = method.options
-          .filter(a => a.key !== 'bespoke')
-          .map(a => `    ${a.key}: ${a.value}`)
+          .filter((a) => a.key !== 'bespoke')
+          .map((a) => `    ${a.key}: ${a.value}`)
           .join('\r\n');
 
         mainServerless += `
@@ -209,8 +208,8 @@ ${options + '\r\n'}    events:
         mainServerless += `
   ${controllerDataItem.name}_${event.name}:
     handler: handler.${controllerDataItem.name}_${event.name}
-${event.options.map(a => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
-${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
+${event.options.map((a) => `    ${a.key}: ${a.value}`).join('\r\n') + '\r\n'}    events:
+${event.rate.map((a) => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
       }
 
       for (const websocket of controllerDataItem.websockets) {
@@ -220,7 +219,7 @@ ${event.rate.map(a => `      - schedule: ${a}`).join('\r\n') + '\r\n'}`;
     events:
 ${websocket.routeKey
   .map(
-    a => `      - websocket: 
+    (a) => `      - websocket: 
          route: ${a}`
   )
   .join('\r\n')}`;
@@ -238,18 +237,18 @@ ${websocket.routeKey
       const funcNode = method.declaration;
 
       assert(funcNode.getParameters().length >= 1, 'The export must have a request model parameter');
-      const eventArg = funcNode.getParameters()[0].getType();
+      const firstParameter = funcNode.getParameters()[0];
+      const eventArg = firstParameter.getType();
       const typeArgument = eventArg;
       let requestName: string;
 
-      symbolManager.addSymbol(typeArgument, true);
+      symbolManager.addSymbol(firstParameter, true);
       requestName = typeArgument.getSymbol().getName();
-      requestSymbolManager.addSymbol(typeArgument, true);
+      requestSymbolManager.addSymbol(firstParameter, true);
 
       const returnType = funcNode.getReturnType();
       assert(returnType.getSymbol().getName() === 'Promise', 'Return type must must be a promise');
-      const returnTypeArgument = returnType.getTypeArguments()[0];
-      const httpResponseTypeArgument = returnTypeArgument;
+      const httpResponseTypeArgument = returnType.getTypeArguments()[0].getSymbol().getDeclarations()[0];
 
       symbolManager.addSymbol(httpResponseTypeArgument, true);
       addFunction(
@@ -257,15 +256,15 @@ ${websocket.routeKey
         funcName,
         requestName,
         httpResponseTypeArgument.getSymbol().getName(),
-        method.options.find(a => a.key === 'statusCodes').value,
+        method.options.find((a) => a.key === 'statusCodes').value,
         `/${controllerDataItem.route || controllerDataItem.name}/${method.path}`,
         method.method,
-        method.options.find(a => a.key === 'description')?.value,
-        !!method.options.find(a => a.key === 'auth')?.value
+        method.options.find((a) => a.key === 'description')?.value,
+        !!method.options.find((a) => a.key === 'auth')?.value
       );
     }
     for (const websocket of controllerDataItem.websockets) {
-      if (websocket.routeKey.find(a => a[0] === '$')) {
+      if (websocket.routeKey.find((a) => a[0] === '$')) {
         continue;
       }
 
@@ -278,7 +277,7 @@ ${websocket.routeKey
         eventArg.getSymbol().getName() === 'WebsocketRequestEvent',
         'WebsocketRequestEvent argument must be a generic event class'
       );
-      const typeArgument = eventArg.getTypeArguments()[0];
+      const typeArgument = eventArg.getTypeArguments()[0].getSymbol().getDeclarations()[0];
       let requestName: string;
       symbolManager.addSymbol(typeArgument, true);
       requestSymbolManager.addSymbol(typeArgument, true);
@@ -294,7 +293,7 @@ ${websocket.routeKey
       for (const parameter of funcNode.getParameters()) {
         const eventArg = parameter.getType();
         if (eventArg.getSymbol().getName() === 'WebSocketResponse') {
-          const typeArgument = eventArg.getTypeArguments()[0];
+          const typeArgument = eventArg.getTypeArguments()[0].getSymbol().getDeclarations()[0];
           let requestName: string;
           symbolManager.addSymbol(typeArgument, true);
           requestName = typeArgument.getSymbol().getName();
@@ -317,10 +316,12 @@ ${websocket.routeKey
     let js = ejs.render(
       fs.readFileSync(require.resolve(templateVersion), {encoding: 'utf8'}),
       {
-        interfaces: symbolManager.symbols.map(a => getSource(a)),
+        interfaces: Utils.unique([...symbolManager.types], (e) =>
+          e.getText(undefined, TypeFormatFlags.NoTruncation)
+        ).map((a) => getSource(a)),
         controllers,
       },
-      {escape: e => e}
+      {escape: (e) => e}
     );
 
     for (const outputFile of outputFiles) {
@@ -342,12 +343,12 @@ ${websocket.routeKey
 
   if (openApi) {
     console.time('write openapi template');
-    const interfaces = symbolManager.symbolTypes
-      .filter(a => !a.isUnion())
-      .map(a => {
+    const interfaces = [...symbolManager.types]
+      .filter((a) => !a.isUnion())
+      .map((a) => {
         return {
           name: (a.getSymbol() || a.getAliasSymbol()).getEscapedName(),
-          fields: a.getProperties().map(topP => {
+          fields: a.getProperties().map((topP) => {
             function getType(p: Symbol) {
               const typeV = p.getDeclarations()[0].getType();
               let type: string;
@@ -366,17 +367,14 @@ ${websocket.routeKey
                     type = 'type: ' + typeV.getText();
                     break;
                   case 'Array':
-                    if (typeV.getArrayType().getSymbol()) {
+                    if (typeV.getArrayElementType().getSymbol()) {
                       type = `type: array
           items:
-            $ref: '#/components/schemas/${typeV
-              .getArrayType()
-              .getSymbol()
-              .getEscapedName()}'`;
+            $ref: '#/components/schemas/${typeV.getArrayElementType().getSymbol().getEscapedName()}'`;
                     } else {
                       type = `type: array
           items:
-            type: ${typeV.getArrayType().getText()}`;
+            type: ${typeV.getArrayElementType().getText()}`;
                     }
 
                     break;
@@ -401,7 +399,7 @@ ${websocket.routeKey
         interfaces,
         controllers,
       },
-      {escape: e => e}
+      {escape: (e) => e}
     );
 
     const header = fs.readFileSync(apiPath + 'openApi-header.yaml', {encoding: 'utf8'});
@@ -431,11 +429,29 @@ const readJson = (path: string) => {
 };
 
 function buildValidator(apiPath: string) {
-  for (const type of requestSymbolManager.types) {
-    const declaredType = type.getSymbol().getDeclaredType();
+  for (const t of requestSymbolManager.types) {
+    const declaredType = t.getSymbol()?.getDeclaredType();
+    if (!declaredType) {
+      continue;
+    }
+    const name = t.getText(undefined, TypeFormatFlags.NoTruncation);
+    if (name.indexOf('Array') === 0) continue;
+    if (name.indexOf('ObjectId') === 0) continue;
+    if (name.indexOf('ObjectID') === 0) continue;
+    if (name.indexOf('Date') === 0) continue;
+    if (name.indexOf('{') === 0) continue;
+    const str = (t.getSymbol() ?? t.getAliasSymbol())?.getDeclarations()[0]?.getText();
+    if (!str) continue;
+    if (str.indexOf('interface Array') === 0) continue;
+    /*
+    if (str.indexOf('{') === 0) {
+      str = 'type ' + name + ' = ' + str;
+    }
+*/
+
     const apiFullPath = fs.realpathSync(apiPath).replace(/\\/g, '/');
     const text = declaredType.getText().replace(apiFullPath, '..');
-    buildValidatorMethod(apiFullPath, type.getSymbol().getName(), text, type);
+    buildValidatorMethod(apiFullPath, t.getSymbol().getName(), text, t);
   }
   let js = `
 /* This file was generated by https://github.com/dested/serverless-client-builder */
@@ -504,9 +520,11 @@ function addFunction(
   description: string,
   auth: boolean
 ) {
-  if (!errorTypes.find(a => a === 401)) errorTypes.push(401);
+  if (!errorTypes.find((a) => a === 401)) {
+    errorTypes.push(401);
+  }
   const handleType = `{200?:(result:${returnType})=>void,500?:(result:string)=>void,${errorTypes
-    .map(a => {
+    .map((a) => {
       const statusCode = a;
       if (statusCode === 401) {
         return `${statusCode}?:(error:string)=>void`;
@@ -516,7 +534,7 @@ function addFunction(
     })
     .join(',')}}`;
 
-  let controller = controllers.find(a => a.controllerName === controllerName);
+  let controller = controllers.find((a) => a.controllerName === controllerName);
   if (!controller) {
     controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
     controllers.push(controller);
@@ -537,7 +555,7 @@ function addFunction(
   });
 }
 function addWebsocketFunction(controllerName: string, name: string, requestType: string, route: string) {
-  let controller = controllers.find(a => a.controllerName === controllerName);
+  let controller = controllers.find((a) => a.controllerName === controllerName);
   if (!controller) {
     controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
     controllers.push(controller);
@@ -549,7 +567,7 @@ function addWebsocketFunction(controllerName: string, name: string, requestType:
   });
 }
 function addWebsocketEvent(controllerName: string, name: string, requestType: string, route: string) {
-  let controller = controllers.find(a => a.controllerName === controllerName);
+  let controller = controllers.find((a) => a.controllerName === controllerName);
   if (!controller) {
     controller = {controllerName, functions: [], websocketFunctions: [], websocketEvents: []};
     controllers.push(controller);
@@ -562,7 +580,7 @@ function addWebsocketEvent(controllerName: string, name: string, requestType: st
 }
 
 function kebabToCamel(name: string) {
-  return name.replace(/-([a-z])/g, g => {
+  return name.replace(/-([a-z])/g, (g) => {
     return g[1].toUpperCase();
   });
 }
@@ -581,16 +599,24 @@ function matchAll(re: RegExp, str: string) {
   return results;
 }
 
-function getSource(symbol: ts.Symbol, addExport: boolean = true) {
-  return symbol.declarations
-    .map(a => {
-      let str = a.getText();
-      if (addExport && str.indexOf('export') === -1) {
-        str = 'export ' + str;
-      }
-      return str;
-    })
-    .join('\n');
+function getSource(t: Type, addExport: boolean = true) {
+  if (!t) return '';
+  const name = t.getText(undefined, TypeFormatFlags.NoTruncation);
+  if (name.indexOf('ObjectId') === 0) return '';
+  if (name.indexOf('ObjectID') === 0) return '';
+  if (name.indexOf('Array') === 0) return '';
+  if (name.indexOf('Date') === 0) return '';
+  if (name.indexOf('{') === 0) return '';
+  let str = (t.getSymbol() ?? t.getAliasSymbol())?.getDeclarations()[0]?.getText();
+  if (!str) return '';
+  if (str.indexOf('interface Array') === 0) return '';
+  if (str.indexOf('{') === 0) {
+    str = 'type ' + name + ' = ' + str;
+  }
+  if (addExport && str.indexOf('export') === -1) {
+    str = 'export ' + str;
+  }
+  return str;
 }
 
 export interface ControllerData {

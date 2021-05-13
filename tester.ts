@@ -1,5 +1,5 @@
 import * as fs from 'fs';
-import Project, {SourceFile} from 'ts-simple-ast';
+import {Project, SourceFile} from 'ts-morph';
 import {ManageSymbols} from './manageSymbols';
 
 export class Harness {
@@ -23,6 +23,7 @@ export class Harness {
 const tests = fs.readdirSync('./tests');
 const harness = new Harness();
 for (const test of tests) {
+  /*
   const source = harness.start(`./tests/${test}`);
   const symbolManager = new ManageSymbols();
   symbolManager.addSymbol(source.getExportedDeclarations()[0].getType(), true);
@@ -32,6 +33,5 @@ for (const test of tests) {
     console.log(`${test} Failed`);
   }
   break;
+*/
 }
-
-
