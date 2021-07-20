@@ -6,8 +6,7 @@ import {MethodDeclaration, Project, Symbol, SyntaxKind, Type, TypeFormatFlags} f
 import {ManageSymbols} from './manageSymbols';
 import {buildValidatorMethod, validationMethods} from './validationTester';
 import {Utils} from './utils';
-
-const requestSymbolManager = new ManageSymbols();
+const symbolManager = new ManageSymbols();
 
 export function processFile(
   apiPath: string,
@@ -25,12 +24,12 @@ export function processFile(
 
   const project = new Project({
     tsConfigFilePath,
+    // skipLoadingLibFiles: true,
   });
   console.timeEnd('parse');
 
   console.time('get controllers');
 
-  const symbolManager = new ManageSymbols();
   const controllerDataItems: ControllerData[] = [];
   for (const sourceFile of project.getSourceFiles()) {
     for (const classDeclaration of sourceFile.getDescendantsOfKind(SyntaxKind.ClassDeclaration)) {
@@ -237,20 +236,20 @@ ${websocket.routeKey
       const funcNode = method.declaration;
 
       assert(funcNode.getParameters().length >= 1, 'The export must have a request model parameter');
+
       const firstParameter = funcNode.getParameters()[0];
       const eventArg = firstParameter.getType();
       const typeArgument = eventArg;
       let requestName: string;
 
-      symbolManager.addSymbol(firstParameter, true);
+      symbolManager.addSymbol(firstParameter, true, true);
       requestName = typeArgument.getSymbol().getName();
-      requestSymbolManager.addSymbol(firstParameter, true);
 
       const returnType = funcNode.getReturnType();
       assert(returnType.getSymbol().getName() === 'Promise', 'Return type must must be a promise');
       const httpResponseTypeArgument = returnType.getTypeArguments()[0].getSymbol().getDeclarations()[0];
 
-      symbolManager.addSymbol(httpResponseTypeArgument, true);
+      symbolManager.addSymbol(httpResponseTypeArgument, true, false);
       addFunction(
         method.controllerName,
         funcName,
@@ -279,8 +278,7 @@ ${websocket.routeKey
       );
       const typeArgument = eventArg.getTypeArguments()[0].getSymbol().getDeclarations()[0];
       let requestName: string;
-      symbolManager.addSymbol(typeArgument, true);
-      requestSymbolManager.addSymbol(typeArgument, true);
+      symbolManager.addSymbol(typeArgument, true, true);
       requestName = typeArgument.getSymbol().getName();
 
       addWebsocketFunction(websocket.controllerName, funcName, requestName, websocket.routeKey[0]);
@@ -295,7 +293,7 @@ ${websocket.routeKey
         if (eventArg.getSymbol().getName() === 'WebSocketResponse') {
           const typeArgument = eventArg.getTypeArguments()[0].getSymbol().getDeclarations()[0];
           let requestName: string;
-          symbolManager.addSymbol(typeArgument, true);
+          symbolManager.addSymbol(typeArgument, true, false);
           requestName = typeArgument.getSymbol().getName();
           addWebsocketEvent(websocketEvent.controllerName, funcName, requestName, websocketEvent.routeKey);
           found = true;
@@ -429,7 +427,7 @@ const readJson = (path: string) => {
 };
 
 function buildValidator(apiPath: string) {
-  for (const t of requestSymbolManager.types) {
+  for (const t of symbolManager.requestTypes) {
     const declaredType = t.getSymbol()?.getDeclaredType();
     if (!declaredType) {
       continue;

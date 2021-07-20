@@ -2,16 +2,23 @@ import {Node, Type, TypeFormatFlags, TypeGuards} from 'ts-morph';
 
 export class ManageSymbols {
   types = new Set<Type>();
+  requestTypes = new Set<Type>();
 
-  addSymbol(type: Node, topLevel: boolean) {
-    const text = type.getType().getText(undefined, TypeFormatFlags.NoTruncation);
+  addSymbol(type: Node, topLevel: boolean, isRequest: boolean) {
+    const t = type.getType();
+
+    const text = (t.getSymbol() ?? t.getAliasSymbol())?.getName();
+    if (!text) {
+      console.log('AN ERROR HAS OCCURRED WHILE TRYING TO GET THE SYMBOL NAME', type.getText());
+      return;
+    }
     if (text === 'any') return;
     if (text === 'Date') return;
     if (text === 'ObjectId') return;
     if (text === 'ObjectID') return;
     if (text.indexOf('Array') === 0) return;
-    if (text === 'T') return '';
-    if (text === 'T[]') return '';
+    if (text === 'T') return;
+    if (text === 'T[]') return;
 
     const descendants = type.getDescendants();
     for (const descendant of descendants) {
@@ -24,9 +31,12 @@ export class ManageSymbols {
       if (foundType) {
         if (!this.types.has(foundType)) {
           this.types.add(foundType);
+          if (isRequest) {
+            this.requestTypes.add(foundType);
+          }
           const symbol = foundType.getSymbol() ?? foundType.getAliasSymbol();
           if (symbol && symbol.getDeclarations()[0]) {
-            this.addSymbol(symbol.getDeclarations()[0], false);
+            this.addSymbol(symbol.getDeclarations()[0], false, isRequest);
           }
         }
       }
