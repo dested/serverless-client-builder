@@ -106,7 +106,7 @@ clientOptions.handleError(body.error || responseText);
               }
             }
           }
-        } catch (ex) {
+        } catch (ex:any) {
           if (!handle[500]) {
 clientOptions.handleError(ex.toString());
           } else {
@@ -126,7 +126,7 @@ const response = await fetch(url,   transformOptions(options));
 const status = response.status;
 const responseText = await response.text();
 return handleResponse(responseText,status,handle,clientOptions);
-}catch(ex){
+}catch(ex:any){
 return handleResponse(ex.toString(),500,handle,clientOptions);
 
 }}
@@ -147,7 +147,7 @@ const response = await fetch(url,   transformOptions(options));
 const status = response.status;
 const responseText = await response.text();
 return handleResponse(responseText,status,handle,clientOptions);
-}catch(ex){
+}catch(ex:any){
 return handleResponse(ex.toString(),500,handle,clientOptions);
 
 }}

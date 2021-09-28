@@ -100,6 +100,9 @@ declare type ObjectId = string;
         <%= func.errorTypes.filter(a =>a!==401).map(a => `else if (status === ${a}) {
             await handle[${a}](responseText === "" ? null : JSON.parse(responseText));
         }`).join('') %>
+        else if (status===412){
+        (this.options as any).handleAlert(JSON.parse(responseText));
+        }
         else if (status===401){
         <%if(func.errorTypes.find(a =>a===401)){%>
             if(!handle[401]){
